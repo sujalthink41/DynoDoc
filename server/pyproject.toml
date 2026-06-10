@@ -1,0 +1,139 @@
+[project]
+name = "dynodoc-server"
+version = "0.1.0"
+description = "DynoDoc backend — AI-native learning platform"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9",
+    "mypy>=1.14",
+    "import-linter>=2.0",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",
+    "httpx>=0.28",
+    "pre-commit>=4.0",
+]
+
+# ----------------------------------------------------------------------------
+# Ruff — linting + import sorting + formatting
+# ----------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort (import order)
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "C4",   # flake8-comprehensions
+    "PT",   # flake8-pytest-style
+    "ASYNC",# flake8-async
+    "TID",  # flake8-tidy-imports
+    "RUF",  # ruff-specific rules
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.flake8-bugbear]
+# These FastAPI helpers are designed to be called in argument defaults.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Header"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"  # absolute imports only — enforces clean module boundaries
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # assert is fine in tests
+
+# ----------------------------------------------------------------------------
+# mypy — strict static typing on the application code
+# ----------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_reexport = true
+show_error_codes = true
+mypy_path = "."
+
+# ----------------------------------------------------------------------------
+# pytest
+# ----------------------------------------------------------------------------
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra -q --strict-markers"
+
+# ----------------------------------------------------------------------------
+# coverage
+# ----------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+
+# ----------------------------------------------------------------------------
+# import-linter — enforces the architecture's dependency rules (docs §10.1)
+# so the layering can't rot into spaghetti. Run with `uv run lint-imports`.
+# ----------------------------------------------------------------------------
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "Layered architecture (entrypoints -> processes -> domains -> shared)"
+type = "layers"
+layers = [
+    "app.entrypoints",
+    "app.processes",
+    "app.domains",
+    "app.shared",
+]
+
+[[tool.importlinter.contracts]]
+name = "Domains must not import outer or sibling layers"
+type = "forbidden"
+source_modules = ["app.domains"]
+forbidden_modules = [
+    "app.entrypoints",
+    "app.processes",
+    "app.platform",
+    "app.runtime",
+]
+# The ONLY allowed domain -> platform import: a domain's persistence adapter
+# touching the database (see docs §10 "the one rule that keeps it clean").
+# These modules don't exist yet (Phase 0), so don't fail on the unmatched rule.
+unmatched_ignore_imports_alerting = "none"
+ignore_imports = [
+    "app.domains.*.persistence -> app.platform.database",
+    "app.domains.*.persistence -> app.platform.database.*",
+]
+
+[[tool.importlinter.contracts]]
+name = "Platform must not import domains, processes, or entrypoints"
+type = "forbidden"
+source_modules = ["app.platform"]
+forbidden_modules = [
+    "app.domains",
+    "app.processes",
+    "app.entrypoints",
+    "app.runtime",
+]

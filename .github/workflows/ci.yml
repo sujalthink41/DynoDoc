@@ -1,0 +1,53 @@
+name: CI
+
+# Runs on every push to any branch AND on every pull request.
+# → feature-branch pushes are checked, and merges into main are checked.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# Cancel an in-progress run when new commits are pushed to the same ref,
+# so we don't waste minutes on stale commits.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: CI only needs to read the repo.
+permissions:
+  contents: read
+
+jobs:
+  backend-gates:
+    name: Backend gates (ruff, mypy, import-linter, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: server/uv.lock
+
+      - name: Install dependencies (locked)
+        run: uv sync --frozen
+
+      - name: Ruff — lint + import order
+        run: uv run ruff check .
+
+      - name: Ruff — format check
+        run: uv run ruff format --check .
+
+      - name: Mypy — strict type check
+        run: uv run mypy app
+
+      - name: Import contracts — import-linter
+        run: uv run lint-imports
+
+      - name: Pytest — all tests
+        run: uv run pytest --cov --cov-report=term-missing

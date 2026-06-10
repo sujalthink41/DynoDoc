@@ -1,0 +1,54 @@
+# Pre-commit hooks for DynoDoc.
+# Python hooks run our project-pinned tools via uv (no version drift with the repo).
+#   Install once:  uv run --directory server pre-commit install
+default_stages: [pre-commit]
+
+repos:
+  # ---- File hygiene -------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+
+  # ---- Python: lint / format / type-check (server) ------------------------
+  # Local hooks so the exact ruff/mypy from server/pyproject.toml are used,
+  # and uv handles the working directory. pass_filenames=false → tool config
+  # decides what to scan.
+  - repo: local
+    hooks:
+      - id: ruff-lint
+        name: ruff (lint + import sort)
+        entry: uv run --directory server ruff check --fix .
+        language: system
+        types: [python]
+        files: ^server/.*\.py$
+        pass_filenames: false
+
+      - id: ruff-format
+        name: ruff (format)
+        entry: uv run --directory server ruff format .
+        language: system
+        types: [python]
+        files: ^server/.*\.py$
+        pass_filenames: false
+
+      - id: mypy
+        name: mypy (strict, app/)
+        entry: uv run --directory server mypy app
+        language: system
+        types: [python]
+        files: ^server/app/.*\.py$
+        pass_filenames: false
+
+      - id: import-linter
+        name: import-linter (architecture contracts)
+        entry: uv run --directory server lint-imports
+        language: system
+        types: [python]
+        files: ^server/app/.*\.py$
+        pass_filenames: false
