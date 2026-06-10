@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # Logging: pretty colourised lines in development, structured JSON otherwise.
+    log_level: str = "INFO"
+    log_json: bool = False  # force JSON even in development
+
     # Database (asyncpg in prod, aiosqlite in tests/dev).
     database_url: str = "sqlite+aiosqlite:///./dynodoc.db"
     db_echo: bool = False
