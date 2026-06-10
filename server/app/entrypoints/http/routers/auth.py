@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import RedirectResponse
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.user.dtos import Principal
@@ -33,8 +34,9 @@ async def google_callback(
     settings: Settings = Depends(get_settings),
 ) -> RedirectResponse:
     identity = await google_oauth.complete_login(request)
-    user, _ = await get_or_create_oauth_user(session, identity=identity)
+    user, is_new = await get_or_create_oauth_user(session, identity=identity)
     write_session(request.session, to_principal(user))
+    logger.bind(user_id=str(user.id), is_new=is_new).info("user signed in via google")
     return RedirectResponse(
         url=settings.frontend_post_login_url, status_code=status.HTTP_303_SEE_OTHER
     )
@@ -53,7 +55,8 @@ async def dev_login(
     session: AsyncSession = Depends(db_session),
 ) -> Principal:
     identity = GoogleIdentity(subject=f"dev:{body.email}", email=str(body.email), name=body.name)
-    user, _ = await get_or_create_oauth_user(session, identity=identity)
+    user, is_new = await get_or_create_oauth_user(session, identity=identity)
     principal = to_principal(user)
     write_session(request.session, principal)
+    logger.bind(user_id=str(user.id), is_new=is_new).info("user signed in via dev-login")
     return principal
