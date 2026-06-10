@@ -266,6 +266,18 @@ Each ADR: **Context → Decision → Why → Alternatives rejected → Consequen
 - **Alternatives rejected:** `text-embedding-3-large` (3072-dim, pricier, marginal gain now); Gemini embeddings (kept swappable via the port).
 - **Consequences:** Changing the model later means re-embedding the corpus (acknowledged); the port makes that swap mechanical.
 
+### ADR-017 — Align to the reference codebase (refines ADR-002, supersedes session parts of ADR-006/009)
+- **Context:** We adopted the conventions of an existing production codebase to stay consistent and pragmatic.
+- **Decision:**
+  - **Ports + fakes only for external/non-deterministic dependencies** (LLM, embeddings, sandbox, search, Google). The **database is accessed via plain `async` functions taking `AsyncSession`** and tested against **real SQLite** — no repository Protocols, no in-memory DB fakes. (Refines ADR-002.)
+  - **Auth sessions are signed cookies** (Starlette `SessionMiddleware`) carrying the `Principal` + a CSRF token. **No server-side session store / Redis for auth.** (Supersedes the session pieces of ADR-006/009; Redis is still used later for leaderboards.)
+  - **Central errors:** one `AppError(message, code, status_code)` + subclasses in `shared/errors`; domains never define their own.
+  - **Mixins** for `id`/timestamps; SQLAlchemy ORM models; Pydantic DTOs in each domain's `dtos.py`.
+  - **import-linter relaxed** to the single layered contract; domains may use `platform.persistence`, and platform helpers may touch domain models.
+  - **Tests run on real SQLite** (aiosqlite); Postgres (asyncpg) in prod.
+- **Why:** Faking a database is low-value and lower-fidelity than testing on SQLite; cookie sessions remove infra (no Redis) for auth; consistency with a proven codebase.
+- **Consequences:** "Ports where they pay off," not "ports everywhere." Redis is no longer on the critical path for authentication.
+
 ---
 
 ## 10. Folder Structure (reflects the architecture)

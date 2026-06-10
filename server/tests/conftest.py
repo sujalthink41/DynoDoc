@@ -8,7 +8,13 @@ from collections.abc import AsyncIterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
+import app.domains.user.models  # noqa: F401  (register tables on Base.metadata)
+from app.entrypoints.http.deps import get_database
+from app.platform.persistence.base import Base
+from app.platform.persistence.database import Database
 from app.runtime.application import create_app
 from app.runtime.settings import Settings
 
@@ -19,8 +25,33 @@ def settings() -> Settings:
 
 
 @pytest.fixture
-async def client(settings: Settings) -> AsyncIterator[AsyncClient]:
+async def database() -> AsyncIterator[Database]:
+    """A real, in-memory SQLite database with all tables created.
+
+    StaticPool keeps the single in-memory connection alive for the test, so the
+    schema + data persist and are shared between the test and the app.
+    """
+    engine = create_async_engine(
+        "sqlite+aiosqlite://",
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield Database(engine=engine, sessionmaker=async_sessionmaker(engine, expire_on_commit=False))
+    await engine.dispose()
+
+
+@pytest.fixture
+async def db_session(database: Database) -> AsyncIterator[AsyncSession]:
+    async with database.sessionmaker() as session:
+        yield session
+
+
+@pytest.fixture
+async def client(settings: Settings, database: Database) -> AsyncIterator[AsyncClient]:
     app = create_app(settings)
+    app.dependency_overrides[get_database] = lambda: database
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

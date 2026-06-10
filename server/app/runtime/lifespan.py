@@ -1,7 +1,8 @@
-"""Application lifespan — startup/shutdown hooks.
+"""Application lifespan — open/close shared resources.
 
-Empty for Phase 0. As slices land, this opens/closes the DB pool, the Redis
-connection, and warms caches.
+Builds the database engine on startup and disposes it on shutdown. (Runs under a
+real ASGI server; in-process httpx tests inject the database via dependency
+override instead.)
 """
 
 from collections.abc import AsyncIterator
@@ -9,9 +10,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.platform.persistence.database import build_database
+
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    # startup
-    yield
-    # shutdown
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    app.state.database = build_database(app.state.settings)
+    try:
+        yield
+    finally:
+        await app.state.database.engine.dispose()

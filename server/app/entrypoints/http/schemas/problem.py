@@ -12,6 +12,7 @@ class ProblemDetail(BaseModel):
     type: str = "about:blank"
     title: str
     status: int
+    code: str | None = None
     detail: str | None = None
     instance: str | None = None
     errors: list[FieldError] | None = None
