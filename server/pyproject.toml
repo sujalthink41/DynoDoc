@@ -7,8 +7,16 @@ requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
-    "pydantic>=2.10",
+    "pydantic[email]>=2.10",
     "pydantic-settings>=2.7",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "greenlet>=3.0",
+    "asyncpg>=0.30",
+    "aiosqlite>=0.20",
+    "authlib>=1.3",
+    "itsdangerous>=2.2",
+    "loguru>=0.7",
 ]
 
 [dependency-groups]
@@ -58,6 +66,9 @@ ban-relative-imports = "all"  # absolute imports only — enforces clean module 
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]  # assert is fine in tests
+# Alembic migrations are generated/boilerplate-ish: allow long lines + the
+# metadata-registration import that looks unused.
+"app/platform/persistence/migrations/**" = ["E501", "F401"]
 
 # ----------------------------------------------------------------------------
 # mypy — strict static typing on the application code
@@ -72,6 +83,13 @@ warn_unused_ignores = true
 no_implicit_reexport = true
 show_error_codes = true
 mypy_path = "."
+# Alembic migration scripts use dynamic alembic.op/context APIs — not worth
+# strict-typing the generated boilerplate.
+exclude = ["app/platform/persistence/migrations/"]
+
+[[tool.mypy.overrides]]
+module = ["authlib.*"]
+ignore_missing_imports = true
 
 # ----------------------------------------------------------------------------
 # pytest
@@ -98,6 +116,11 @@ show_missing = true
 [tool.importlinter]
 root_package = "app"
 
+# Layered direction (high -> low). Lower layers must never import upper ones:
+#   shared is the leaf; domains can't import processes/entrypoints; etc.
+# `platform` and `runtime` are intentionally NOT in the chain: domains may use
+# platform.persistence (session/Base/mixins) directly, and platform helpers may
+# touch domain models — the pragmatic style proven in the reference project.
 [[tool.importlinter.contracts]]
 name = "Layered architecture (entrypoints -> processes -> domains -> shared)"
 type = "layers"
@@ -106,34 +129,4 @@ layers = [
     "app.processes",
     "app.domains",
     "app.shared",
-]
-
-[[tool.importlinter.contracts]]
-name = "Domains must not import outer or sibling layers"
-type = "forbidden"
-source_modules = ["app.domains"]
-forbidden_modules = [
-    "app.entrypoints",
-    "app.processes",
-    "app.platform",
-    "app.runtime",
-]
-# The ONLY allowed domain -> platform import: a domain's persistence adapter
-# touching the database (see docs §10 "the one rule that keeps it clean").
-# These modules don't exist yet (Phase 0), so don't fail on the unmatched rule.
-unmatched_ignore_imports_alerting = "none"
-ignore_imports = [
-    "app.domains.*.persistence -> app.platform.database",
-    "app.domains.*.persistence -> app.platform.database.*",
-]
-
-[[tool.importlinter.contracts]]
-name = "Platform must not import domains, processes, or entrypoints"
-type = "forbidden"
-source_modules = ["app.platform"]
-forbidden_modules = [
-    "app.domains",
-    "app.processes",
-    "app.entrypoints",
-    "app.runtime",
 ]

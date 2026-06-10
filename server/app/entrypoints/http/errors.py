@@ -27,10 +27,10 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
         return _problem_response(
             ProblemDetail(
-                type=exc.error_type,
-                title=exc.title,
+                type=f"https://dynodoc.app/errors/{exc.code}",
+                title=exc.message,
                 status=exc.status_code,
-                detail=exc.detail,
+                code=exc.code,
                 instance=request.url.path,
             )
         )
@@ -41,10 +41,10 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         return _problem_response(
             ProblemDetail(
-                type="https://dynodoc.app/errors/validation",
+                type="https://dynodoc.app/errors/validation_error",
                 title="Validation failed",
                 status=422,
-                detail="The request did not pass validation.",
+                code="validation_error",
                 instance=request.url.path,
                 errors=[
                     FieldError(
