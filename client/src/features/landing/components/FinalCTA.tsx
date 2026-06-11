@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion'
 
-import { Button } from '@/components/ui/Button'
-import { loginWithGoogle } from '@/features/auth/api/auth'
+import { StartLearningButton } from '@/features/landing/components/StartLearningButton'
 
 export function FinalCTA() {
   return (
@@ -19,9 +18,9 @@ export function FinalCTA() {
         <p className="mx-auto mt-4 max-w-xl text-muted">
           Your personalized course is one question away.
         </p>
-        <Button onClick={loginWithGoogle} className="mt-8 px-8 py-3.5">
+        <StartLearningButton className="mt-8 px-8 py-3.5">
           Start learning free →
-        </Button>
+        </StartLearningButton>
       </motion.div>
     </section>
   )

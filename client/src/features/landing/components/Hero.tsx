@@ -2,9 +2,8 @@ import { motion, type Variants } from 'framer-motion'
 import { useEffect, useState } from 'react'
 
 import { AIThinking } from '@/components/ui/AIThinking'
-import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { loginWithGoogle } from '@/features/auth/api/auth'
+import { StartLearningButton } from '@/features/landing/components/StartLearningButton'
 
 const container: Variants = {
   hidden: {},
@@ -163,10 +162,10 @@ export function Hero() {
         </motion.p>
 
         <motion.div variants={item} className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
-          <Button onClick={loginWithGoogle} className="group px-8 py-3.5">
+          <StartLearningButton className="group px-8 py-3.5">
             Start learning free
             <span className="transition group-hover:translate-x-1">→</span>
-          </Button>
+          </StartLearningButton>
           <a
             href="#how"
             className="rounded-full px-6 py-3.5 font-medium text-muted ring-1 ring-line transition hover:bg-surface hover:text-fg"
