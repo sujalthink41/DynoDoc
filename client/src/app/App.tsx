@@ -1,24 +1,26 @@
-import { Spinner } from '@/components/ui/Spinner'
-import { logout } from '@/features/auth/api/auth'
-import { LoginCard } from '@/features/auth/components/LoginCard'
-import { ProfileCard } from '@/features/auth/components/ProfileCard'
-import { useCurrentUser } from '@/features/auth/hooks/useCurrentUser'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+
+import { AppLayout } from '@/app/AppLayout'
+import { RequireAuth } from '@/app/RequireAuth'
+import { LandingPage } from '@/features/landing/LandingPage'
+import { ProfilePage } from '@/features/profile/ProfilePage'
 
 function App() {
-  const { state, reload } = useCurrentUser()
-
-  const handleLogout = () => {
-    void logout().finally(reload)
-  }
-
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 px-4">
-      {state.status === 'loading' && <Spinner />}
-      {state.status === 'anonymous' && <LoginCard />}
-      {state.status === 'authenticated' && (
-        <ProfileCard user={state.user} onLogout={handleLogout} />
-      )}
-    </main>
+    <BrowserRouter>
+      <Routes>
+        {/* Public */}
+        <Route path="/" element={<LandingPage />} />
+
+        {/* Authenticated product (gated + app shell) */}
+        <Route element={<RequireAuth />}>
+          <Route element={<AppLayout />}>
+            <Route path="/profile" element={<ProfilePage />} />
+            {/* Course / learning routes land here next. */}
+          </Route>
+        </Route>
+      </Routes>
+    </BrowserRouter>
   )
 }
 

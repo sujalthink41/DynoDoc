@@ -31,7 +31,7 @@ export function GoogleButton({ onClick }: GoogleButtonProps) {
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+      className="group flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-white px-4 py-3 font-medium text-slate-700 shadow-sm transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
     >
       <GoogleLogo />
       <span>Continue with Google</span>

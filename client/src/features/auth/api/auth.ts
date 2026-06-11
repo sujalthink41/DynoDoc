@@ -1,19 +1,16 @@
 import { apiGet, apiPost } from '@/lib/apiClient'
-import { API_BASE_URL } from '@/lib/config'
+import { apiUrl } from '@/lib/config'
 import type { UserProfile } from '@/features/auth/types'
 
-/**
- * Start the Google OAuth flow. This is a full-page navigation (not fetch),
- * because OAuth relies on browser redirects and cookies.
- */
+/** Full-page navigation into the backend's Google OAuth flow. */
 export function loginWithGoogle(): void {
-  window.location.href = `${API_BASE_URL}/api/v1/auth/google/login`
+  window.location.href = apiUrl('/auth/google/login')
 }
 
 export function fetchCurrentUser(): Promise<UserProfile> {
-  return apiGet<UserProfile>('/api/v1/me')
+  return apiGet<UserProfile>('/me')
 }
 
 export function logout(): Promise<void> {
-  return apiPost('/api/v1/auth/logout')
+  return apiPost('/auth/logout')
 }

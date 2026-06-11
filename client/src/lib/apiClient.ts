@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '@/lib/config'
+import { apiUrl } from '@/lib/config'
 
 export class ApiError extends Error {
   readonly status: number
@@ -10,27 +10,30 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * GET a JSON resource. `credentials: 'include'` sends the session cookie so the
- * backend can identify the logged-in user.
- */
-export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: 'include',
-  })
+async function parse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     throw new ApiError(response.status)
   }
-  return (await response.json()) as T
+  if (response.status === 204) {
+    return undefined as T
+  }
+  const text = await response.text()
+  return (text ? JSON.parse(text) : undefined) as T
 }
 
-/** POST with no body (e.g. logout). */
-export async function apiPost(path: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    credentials: 'include',
-  })
-  if (!response.ok) {
-    throw new ApiError(response.status)
-  }
+/** GET JSON. `credentials: 'include'` sends the session cookie. */
+export async function apiGet<T>(path: string): Promise<T> {
+  return parse<T>(await fetch(apiUrl(path), { credentials: 'include' }))
+}
+
+/** POST (optionally with a JSON body). Returns parsed JSON, or undefined for 204. */
+export async function apiPost<T = void>(path: string, body?: unknown): Promise<T> {
+  return parse<T>(
+    await fetch(apiUrl(path), {
+      method: 'POST',
+      credentials: 'include',
+      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    }),
+  )
 }
