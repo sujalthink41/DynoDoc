@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from typing import cast
 
 from fastapi import Depends, Request
+from google.adk.models.base_llm import BaseLlm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.user.models import User
@@ -23,6 +24,14 @@ def get_text_generator(request: Request) -> TextGenerator:
     if generator is None:
         raise DependencyUnavailableError("LLM is not configured", code="llm_unavailable")
     return cast(TextGenerator, generator)
+
+
+def get_llm_model(request: Request) -> BaseLlm:
+    """The raw LLM model for ADK agent pipelines (course generation)."""
+    model = getattr(request.app.state, "llm_model", None)
+    if model is None:
+        raise DependencyUnavailableError("LLM is not configured", code="llm_unavailable")
+    return cast(BaseLlm, model)
 
 
 async def db_session(

@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
+from google.adk.models.base_llm import BaseLlm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.course.dtos import CourseSummary, CourseView
@@ -15,10 +16,9 @@ from app.domains.course.repository import (
     to_course_view,
 )
 from app.domains.user.models import User
-from app.entrypoints.http.deps import db_session, get_text_generator, require_principal
+from app.entrypoints.http.deps import db_session, get_llm_model, require_principal
 from app.entrypoints.http.schemas.course import CreateCourseRequest
 from app.processes.course_generation.pipeline import generate_course
-from app.shared.contracts.llm import TextGenerator
 from app.shared.errors import AppError, NotFoundError
 
 router = APIRouter(prefix="/courses", tags=["courses"])
@@ -29,7 +29,7 @@ async def create_course_route(
     body: CreateCourseRequest,
     user: User = Depends(require_principal),
     session: AsyncSession = Depends(db_session),
-    generator: TextGenerator = Depends(get_text_generator),
+    model: BaseLlm = Depends(get_llm_model),
 ) -> CourseView:
     intake = await get_intake_session(session, body.intake_id)
     if intake is None or intake.owner_user_id != user.id:
@@ -39,7 +39,7 @@ async def create_course_route(
 
     course = await generate_course(
         session,
-        generator=generator,
+        model=model,
         owner_user_id=user.id,
         intake_session_id=intake.id,
         goal=intake.goal,

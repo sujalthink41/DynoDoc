@@ -1,15 +1,13 @@
-"""Builder for a provider-agnostic TextGenerator (ADK + LiteLLM).
+"""Builder for a provider-agnostic LLM (ADK + LiteLLM).
 
 Selection (provider, model, api key) is the client's choice — swapping to
-OpenAI/Anthropic/etc. later is config, not code:
+OpenAI/Anthropic/etc. later is config, not code. `build_model()` yields the raw
+LiteLlm (used by ADK agents in the generation pipeline); `build()` wraps it as a
+TextGenerator (used by the single-call intake flow).
 
-    generator = (
-        LlmTextGeneratorBuilder()
-        .provider("gemini")
-        .model("gemini-2.0-flash")
-        .api_key(settings.llm_api_key)
-        .build()
-    )
+    builder = LlmModelBuilder().provider("openai").model("gpt-4.1-mini").api_key(key)
+    model = builder.build_model()      # for ADK agents
+    generator = builder.build()        # for intake's TextGenerator port
 """
 
 from typing import Self
@@ -21,7 +19,7 @@ from app.shared.contracts.llm import TextGenerator
 from app.shared.errors import DependencyUnavailableError
 
 
-class LlmTextGeneratorBuilder:
+class LlmModelBuilder:
     def __init__(self) -> None:
         self._provider = "gemini"
         self._model = "gemini-2.0-flash"
@@ -39,12 +37,15 @@ class LlmTextGeneratorBuilder:
         self._api_key = api_key
         return self
 
-    def build(self) -> TextGenerator:
+    def build_model(self) -> LiteLlm:
         if not self._api_key:
             raise DependencyUnavailableError(
                 "LLM API key is not configured", code="llm_unavailable"
             )
         # LiteLLM model naming: "<provider>/<model>" (e.g. gemini/gemini-2.0-flash,
-        # openai/gpt-4o, anthropic/claude-3-5-sonnet).
+        # openai/gpt-4.1-mini, anthropic/claude-3-5-sonnet).
         model_name = f"{self._provider}/{self._model}"
-        return AdkTextGenerator(model=LiteLlm(model=model_name, api_key=self._api_key))
+        return LiteLlm(model=model_name, api_key=self._api_key)
+
+    def build(self) -> TextGenerator:
+        return AdkTextGenerator(model=self.build_model())

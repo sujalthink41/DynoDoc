@@ -1,9 +1,13 @@
-"""E2E: complete an intake, then generate a course roadmap — all with a fake LLM."""
+"""E2E: complete an intake, then generate a course roadmap via the ADK pipeline.
+
+Intake uses the FakeTextGenerator (the port); generation uses the FakeLlm (ADK's
+model layer). Both keep the flow offline + deterministic.
+"""
 
 from httpx import AsyncClient
 
 from app.domains.course.dtos import IntakeStep, LearnerProfile, Roadmap, RoadmapLecture
-from tests.fixtures.fakes import FakeTextGenerator
+from tests.fixtures.fakes import FakeLlm, FakeTextGenerator
 
 
 async def _login_and_complete_intake(
@@ -27,23 +31,20 @@ async def _login_and_complete_intake(
 
 
 async def test_generate_course_from_intake(
-    client: AsyncClient, fake_text_generator: FakeTextGenerator
+    client: AsyncClient,
+    fake_text_generator: FakeTextGenerator,
+    fake_llm: FakeLlm,
 ) -> None:
     intake_id = await _login_and_complete_intake(client, fake_text_generator)
 
-    fake_text_generator.queue(
-        Roadmap(
-            title="Python Foundations",
-            lectures=[
-                RoadmapLecture(
-                    title="Setup & Basics", summary="Get going", topics=["install", "repl"]
-                ),
-                RoadmapLecture(
-                    title="Data Types", summary="Core types", topics=["str", "int", "list"]
-                ),
-            ],
-        )
+    roadmap = Roadmap(
+        title="Python Foundations",
+        lectures=[
+            RoadmapLecture(title="Setup & Basics", summary="Get going", topics=["install", "repl"]),
+            RoadmapLecture(title="Data Types", summary="Core types", topics=["str", "int"]),
+        ],
     )
+    fake_llm.responses.append(roadmap.model_dump_json())
 
     response = await client.post("/api/v1/courses", json={"intake_id": intake_id})
     assert response.status_code == 201
@@ -52,7 +53,6 @@ async def test_generate_course_from_intake(
     assert [lec["position"] for lec in body["lectures"]] == [1, 2]
     assert body["lectures"][0]["title"] == "Setup & Basics"
 
-    # And it shows up in "my courses".
     listing = await client.get("/api/v1/courses")
     assert listing.status_code == 200
     assert any(c["title"] == "Python Foundations" for c in listing.json())

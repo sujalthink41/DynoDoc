@@ -1,4 +1,4 @@
-"""Integration: the course-generation pipeline against real SQLite + a fake LLM."""
+"""Integration: the ADK course-generation pipeline against real SQLite + a fake LLM."""
 
 from uuid import uuid4
 
@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.course.dtos import Roadmap, RoadmapLecture
 from app.domains.course.repository import list_lectures
 from app.processes.course_generation.pipeline import generate_course
-from tests.fixtures.fakes import FakeTextGenerator
+from tests.fixtures.fakes import FakeLlm
 
 PROFILE = {
     "experience_level": "beginner",
@@ -16,24 +16,21 @@ PROFILE = {
     "weekly_time": "5 hours",
 }
 
+ROADMAP = Roadmap(
+    title="Python for Beginners",
+    lectures=[
+        RoadmapLecture(title="Basics", summary="Vars & types", topics=["variables", "types"]),
+        RoadmapLecture(title="Control Flow", summary="if/for", topics=["if", "loops"]),
+    ],
+)
+
 
 async def test_generate_course_creates_ordered_lectures(db_session: AsyncSession) -> None:
-    generator = FakeTextGenerator()
-    generator.queue(
-        Roadmap(
-            title="Python for Beginners",
-            lectures=[
-                RoadmapLecture(
-                    title="Basics", summary="Vars & types", topics=["variables", "types"]
-                ),
-                RoadmapLecture(title="Control Flow", summary="if/for", topics=["if", "loops"]),
-            ],
-        )
-    )
+    model = FakeLlm(responses=[ROADMAP.model_dump_json()])
 
     course = await generate_course(
         db_session,
-        generator=generator,
+        model=model,
         owner_user_id=uuid4(),
         intake_session_id=uuid4(),
         goal="Learn Python",

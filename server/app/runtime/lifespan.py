@@ -22,18 +22,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.database = build_database(settings)
 
     if settings.llm_api_key:
-        from app.platform.ai.builder import LlmTextGeneratorBuilder
+        from app.platform.ai.builder import LlmModelBuilder
+        from app.platform.ai.text_generator import AdkTextGenerator
 
-        app.state.text_generator = (
-            LlmTextGeneratorBuilder()
+        builder = (
+            LlmModelBuilder()
             .provider(settings.llm_provider)
             .model(settings.llm_model)
             .api_key(settings.llm_api_key)
-            .build()
         )
-        logger.bind(provider=settings.llm_provider, model=settings.llm_model).info(
-            "LLM text generator ready"
-        )
+        model = builder.build_model()
+        app.state.llm_model = model  # for ADK agent pipelines (course generation)
+        app.state.text_generator = AdkTextGenerator(model=model)  # for intake
+        logger.bind(provider=settings.llm_provider, model=settings.llm_model).info("LLM ready")
 
     logger.bind(environment=settings.environment).info("application startup complete")
     try:
