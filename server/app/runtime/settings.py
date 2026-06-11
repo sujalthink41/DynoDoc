@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
     frontend_post_login_url: str = "http://localhost:3000"
 
+    # LLM (provider-agnostic via LiteLLM). Switching provider/model later is just
+    # config. Optional until set — the app degrades to 503 on AI endpoints.
+    llm_provider: str = "gemini"
+    llm_model: str = "gemini-2.0-flash"
+    llm_api_key: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

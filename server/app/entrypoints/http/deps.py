@@ -10,11 +10,19 @@ from app.domains.user.models import User
 from app.domains.user.repository import get_user_by_id
 from app.platform.auth.session import read_session
 from app.platform.persistence.database import Database
-from app.shared.errors import UnauthorizedError
+from app.shared.contracts.llm import TextGenerator
+from app.shared.errors import DependencyUnavailableError, UnauthorizedError
 
 
 def get_database(request: Request) -> Database:
     return cast(Database, request.app.state.database)
+
+
+def get_text_generator(request: Request) -> TextGenerator:
+    generator = getattr(request.app.state, "text_generator", None)
+    if generator is None:
+        raise DependencyUnavailableError("LLM is not configured", code="llm_unavailable")
+    return cast(TextGenerator, generator)
 
 
 async def db_session(
