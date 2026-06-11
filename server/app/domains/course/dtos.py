@@ -75,3 +75,38 @@ class CourseSummary(BaseModel):
     title: str
     goal: str
     status: str
+
+
+# --- Lecture content (writer step) ----------------------------------------
+
+
+class DocDraft(BaseModel):
+    """A writer agent's structured output: one lesson doc (Markdown)."""
+
+    title: str
+    content: str
+
+
+class DocView(BaseModel):
+    id: UUID
+    position: int
+    title: str
+    content: str
+
+
+class ReferenceView(BaseModel):
+    id: UUID
+    type: str
+    url: str
+    title: str
+
+
+class LectureDetailView(BaseModel):
+    id: UUID
+    position: int
+    title: str
+    summary: str
+    topics: list[str]
+    status: str
+    docs: list[DocView]
+    references: list[ReferenceView]

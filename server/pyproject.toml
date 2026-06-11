@@ -19,6 +19,7 @@ dependencies = [
     "loguru>=0.7",
     "google-adk>=1.0",
     "litellm>=1.40",
+    "ddgs>=9.0",
 ]
 
 [dependency-groups]
@@ -94,7 +95,7 @@ module = ["authlib.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["google.adk.*", "google.genai.*", "litellm.*"]
+module = ["google.adk.*", "google.genai.*", "litellm.*", "ddgs.*"]
 ignore_missing_imports = true
 
 # ----------------------------------------------------------------------------

@@ -9,11 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.course.dtos import (
     CourseSummary,
     CourseView,
+    DocView,
     IntakeSessionView,
     LearnerProfile,
+    LectureDetailView,
     LectureView,
+    ReferenceView,
 )
-from app.domains.course.models import Course, IntakeSession, Lecture
+from app.domains.course.models import Course, Doc, IntakeSession, Lecture, Reference
 
 
 async def create_intake_session(
@@ -124,3 +127,65 @@ def to_course_view(course: Course, lectures: list[Lecture]) -> CourseView:
 
 def to_course_summary(course: Course) -> CourseSummary:
     return CourseSummary(id=course.id, title=course.title, goal=course.goal, status=course.status)
+
+
+# --- Lectures & Docs ------------------------------------------------------
+
+
+async def get_lecture(session: AsyncSession, lecture_id: UUID) -> Lecture | None:
+    return await session.get(Lecture, lecture_id)
+
+
+async def add_doc(
+    session: AsyncSession, *, lecture_id: UUID, position: int, title: str, content: str
+) -> Doc:
+    doc = Doc(lecture_id=lecture_id, position=position, title=title, content=content)
+    session.add(doc)
+    return doc
+
+
+async def list_docs(session: AsyncSession, lecture_id: UUID) -> list[Doc]:
+    result = await session.execute(
+        select(Doc).where(Doc.lecture_id == lecture_id).order_by(Doc.position)
+    )
+    return list(result.scalars().all())
+
+
+async def add_reference(
+    session: AsyncSession, *, lecture_id: UUID, position: int, type: str, url: str, title: str
+) -> Reference:
+    reference = Reference(lecture_id=lecture_id, position=position, type=type, url=url, title=title)
+    session.add(reference)
+    return reference
+
+
+async def list_references(session: AsyncSession, lecture_id: UUID) -> list[Reference]:
+    result = await session.execute(
+        select(Reference).where(Reference.lecture_id == lecture_id).order_by(Reference.position)
+    )
+    return list(result.scalars().all())
+
+
+def to_doc_view(doc: Doc) -> DocView:
+    return DocView(id=doc.id, position=doc.position, title=doc.title, content=doc.content)
+
+
+def to_reference_view(reference: Reference) -> ReferenceView:
+    return ReferenceView(
+        id=reference.id, type=reference.type, url=reference.url, title=reference.title
+    )
+
+
+def to_lecture_detail_view(
+    lecture: Lecture, docs: list[Doc], references: list[Reference]
+) -> LectureDetailView:
+    return LectureDetailView(
+        id=lecture.id,
+        position=lecture.position,
+        title=lecture.title,
+        summary=lecture.summary,
+        topics=lecture.topics,
+        status=lecture.status,
+        docs=[to_doc_view(doc) for doc in docs],
+        references=[to_reference_view(ref) for ref in references],
+    )

@@ -50,3 +50,33 @@ class Lecture(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     summary: Mapped[str] = mapped_column(Text)
     topics: Mapped[list[str]] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(String(20), default="outlined")
+
+
+class Doc(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """A written lesson document within a lecture (one per topic)."""
+
+    __tablename__ = "docs"
+
+    lecture_id: Mapped[UUID] = mapped_column(
+        ForeignKey("lectures.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(300))
+    content: Mapped[str] = mapped_column(Text)
+
+
+class Reference(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """A curated external link (article or YouTube) for a lecture.
+
+    Table is `lecture_references` because `references` is a reserved SQL word.
+    """
+
+    __tablename__ = "lecture_references"
+
+    lecture_id: Mapped[UUID] = mapped_column(
+        ForeignKey("lectures.id", ondelete="CASCADE"), index=True
+    )
+    type: Mapped[str] = mapped_column(String(20))  # "article" | "youtube"
+    url: Mapped[str] = mapped_column(String(2048))
+    title: Mapped[str] = mapped_column(String(500))
+    position: Mapped[int] = mapped_column(Integer)

@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     llm_model: str = "gemini-2.0-flash"
     llm_api_key: str | None = None
 
+    # Reference curation uses free, keyless DuckDuckGo web search.
+    search_max_articles: int = 4
+    search_max_videos: int = 2
+
 
 @lru_cache
 def get_settings() -> Settings:

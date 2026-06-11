@@ -11,6 +11,7 @@ from app.domains.user.models import User
 from app.domains.user.repository import get_user_by_id
 from app.platform.auth.session import read_session
 from app.platform.persistence.database import Database
+from app.shared.contracts.curation import ResourceCurator
 from app.shared.contracts.llm import TextGenerator
 from app.shared.errors import DependencyUnavailableError, UnauthorizedError
 
@@ -32,6 +33,14 @@ def get_llm_model(request: Request) -> BaseLlm:
     if model is None:
         raise DependencyUnavailableError("LLM is not configured", code="llm_unavailable")
     return cast(BaseLlm, model)
+
+
+def get_resource_curator(request: Request) -> ResourceCurator:
+    """The reference curator (keyless web search). Always available in the app."""
+    curator = getattr(request.app.state, "resource_curator", None)
+    if curator is None:
+        raise DependencyUnavailableError("Curator is not configured", code="curator_unavailable")
+    return cast(ResourceCurator, curator)
 
 
 async def db_session(

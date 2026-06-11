@@ -36,6 +36,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.text_generator = AdkTextGenerator(model=model)  # for intake
         logger.bind(provider=settings.llm_provider, model=settings.llm_model).info("LLM ready")
 
+    # Reference curation: keyless DuckDuckGo search, always available.
+    from app.platform.search.curator import SearchResourceCurator
+    from app.platform.search.duckduckgo import DuckDuckGoSearchProvider
+
+    app.state.resource_curator = SearchResourceCurator(
+        DuckDuckGoSearchProvider(),
+        max_articles=settings.search_max_articles,
+        max_videos=settings.search_max_videos,
+    )
+
     logger.bind(environment=settings.environment).info("application startup complete")
     try:
         yield
