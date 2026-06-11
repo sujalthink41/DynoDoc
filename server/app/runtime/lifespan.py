@@ -20,6 +20,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = app.state.settings
     setup_logging(settings)
     app.state.database = build_database(settings)
+
+    if settings.llm_api_key:
+        from app.platform.ai.builder import LlmTextGeneratorBuilder
+
+        app.state.text_generator = (
+            LlmTextGeneratorBuilder()
+            .provider(settings.llm_provider)
+            .model(settings.llm_model)
+            .api_key(settings.llm_api_key)
+            .build()
+        )
+        logger.bind(provider=settings.llm_provider, model=settings.llm_model).info(
+            "LLM text generator ready"
+        )
+
     logger.bind(environment=settings.environment).info("application startup complete")
     try:
         yield

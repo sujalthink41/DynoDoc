@@ -10,7 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.entrypoints.http.errors import register_exception_handlers
 from app.entrypoints.http.middleware import RequestContextMiddleware
-from app.entrypoints.http.routers import auth, health, users
+from app.entrypoints.http.routers import auth, health, intake, users
 from app.runtime.bootstrap import wire
 from app.runtime.lifespan import lifespan
 from app.runtime.settings import Settings, get_settings
@@ -55,6 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router, prefix=settings.api_prefix)
     app.include_router(users.router, prefix=settings.api_prefix)
+    app.include_router(intake.router, prefix=settings.api_prefix)
     if settings.environment in ("development", "test"):
         app.include_router(auth.dev_router, prefix=settings.api_prefix)
 
