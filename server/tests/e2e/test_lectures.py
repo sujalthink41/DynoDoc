@@ -1,4 +1,4 @@
-"""E2E: generate a lecture's lesson docs (writer fan-out) — all with a fake LLM."""
+"""E2E: per-topic lesson generation + separate references — all with a fake LLM."""
 
 from httpx import AsyncClient
 
@@ -40,57 +40,40 @@ async def _make_course_with_lecture(
     return str(course.json()["lectures"][0]["id"])
 
 
-async def test_generate_lecture_docs(
+async def test_generate_single_topic(
     client: AsyncClient, fake_text_generator: FakeTextGenerator, fake_llm: FakeLlm
 ) -> None:
     lecture_id = await _make_course_with_lecture(client, fake_text_generator, fake_llm)
 
-    # One canned doc per topic (the lecture has 2 topics).
     fake_llm.responses.append(DocDraft(title="Variables", content="# Variables").model_dump_json())
-    fake_llm.responses.append(DocDraft(title="Loops", content="# Loops").model_dump_json())
-
-    response = await client.post(f"/api/v1/lectures/{lecture_id}/generate")
+    response = await client.post(f"/api/v1/lectures/{lecture_id}/topics/0")
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "ready"
-    assert [doc["position"] for doc in body["docs"]] == [1, 2]
-    assert all(doc["content"] for doc in body["docs"])
+    # Only topic 0 generated → one doc at position 1, lecture still in progress.
+    assert [d["position"] for d in body["docs"]] == [1]
+    assert body["status"] == "in_progress"
 
-    # Idempotent: regenerating returns the same docs without calling the LLM again.
-    again = await client.post(f"/api/v1/lectures/{lecture_id}/generate")
-    assert again.status_code == 200
-    assert len(again.json()["docs"]) == 2
-
-
-async def test_get_lecture_returns_docs(
-    client: AsyncClient, fake_text_generator: FakeTextGenerator, fake_llm: FakeLlm
-) -> None:
-    lecture_id = await _make_course_with_lecture(client, fake_text_generator, fake_llm)
-    fake_llm.responses.append(DocDraft(title="Variables", content="# Variables").model_dump_json())
+    # Generating the second topic completes the lecture.
     fake_llm.responses.append(DocDraft(title="Loops", content="# Loops").model_dump_json())
-    await client.post(f"/api/v1/lectures/{lecture_id}/generate")
+    response = await client.post(f"/api/v1/lectures/{lecture_id}/topics/1")
+    body = response.json()
+    assert [d["position"] for d in body["docs"]] == [1, 2]
+    assert body["status"] == "ready"
 
-    response = await client.get(f"/api/v1/lectures/{lecture_id}")
-    assert response.status_code == 200
-    assert len(response.json()["docs"]) == 2
 
-
-async def test_generated_lecture_includes_curated_references(
+async def test_find_resources_button(
     client: AsyncClient,
     fake_text_generator: FakeTextGenerator,
     fake_llm: FakeLlm,
     fake_curator: FakeResourceCurator,
 ) -> None:
     lecture_id = await _make_course_with_lecture(client, fake_text_generator, fake_llm)
-    fake_llm.responses.append(DocDraft(title="Variables", content="# Variables").model_dump_json())
-    fake_llm.responses.append(DocDraft(title="Loops", content="# Loops").model_dump_json())
     fake_curator.references = [
         ReferenceDraft(type="article", url="https://realpython.com/x", title="Real Python"),
         ReferenceDraft(type="youtube", url="https://youtube.com/watch?v=1", title="Video"),
     ]
 
-    response = await client.post(f"/api/v1/lectures/{lecture_id}/generate")
+    response = await client.post(f"/api/v1/lectures/{lecture_id}/references")
     assert response.status_code == 200
     refs = response.json()["references"]
     assert [r["type"] for r in refs] == ["article", "youtube"]
-    assert refs[0]["url"] == "https://realpython.com/x"

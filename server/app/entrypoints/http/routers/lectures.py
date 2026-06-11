@@ -1,4 +1,4 @@
-"""Lecture routes — read a lecture and lazily generate its lesson content + links."""
+"""Lecture routes — read a lecture, generate one topic at a time, fetch links."""
 
 from uuid import UUID
 
@@ -23,7 +23,7 @@ from app.entrypoints.http.deps import (
     require_principal,
 )
 from app.processes.course_generation.curation import generate_lecture_references
-from app.processes.course_generation.writer import generate_lecture_docs
+from app.processes.course_generation.writer import generate_topic_doc
 from app.shared.contracts.curation import ResourceCurator
 from app.shared.errors import NotFoundError
 
@@ -55,22 +55,41 @@ async def get_lecture_route(
     return await _detail(session, lecture)
 
 
-@router.post("/{lecture_id}/generate", response_model=LectureDetailView)
-async def generate_lecture_route(
+@router.post("/{lecture_id}/topics/{topic_index}", response_model=LectureDetailView)
+async def generate_topic_route(
     lecture_id: UUID,
+    topic_index: int,
     user: User = Depends(require_principal),
     session: AsyncSession = Depends(db_session),
     model: BaseLlm = Depends(get_llm_model),
-    curator: ResourceCurator = Depends(get_resource_curator),
 ) -> LectureDetailView:
     lecture = await _load_owned_lecture(session, lecture_id, user)
+    if topic_index < 0 or topic_index >= len(lecture.topics):
+        raise NotFoundError("Topic not found", code="topic_not_found")
 
-    if await list_docs(session, lecture.id):  # already generated — idempotent
+    docs = await list_docs(session, lecture.id)
+    if any(doc.position == topic_index + 1 for doc in docs):  # already generated — idempotent
         return await _detail(session, lecture)
 
     course = await get_course(session, lecture.course_id)
     profile = (course.learner_profile if course else None) or {}
-    await generate_lecture_docs(session, model=model, lecture=lecture, profile=profile)
-    # Best-effort references (the search provider already swallows its own failures).
-    await generate_lecture_references(session, curator=curator, lecture=lecture)
+    await generate_topic_doc(
+        session, model=model, lecture=lecture, topic_index=topic_index, profile=profile
+    )
+
+    docs = await list_docs(session, lecture.id)
+    lecture.status = "ready" if len(docs) >= len(lecture.topics) else "in_progress"
+    return await _detail(session, lecture)
+
+
+@router.post("/{lecture_id}/references", response_model=LectureDetailView)
+async def generate_references_route(
+    lecture_id: UUID,
+    user: User = Depends(require_principal),
+    session: AsyncSession = Depends(db_session),
+    curator: ResourceCurator = Depends(get_resource_curator),
+) -> LectureDetailView:
+    lecture = await _load_owned_lecture(session, lecture_id, user)
+    if not await list_references(session, lecture.id):  # idempotent
+        await generate_lecture_references(session, curator=curator, lecture=lecture)
     return await _detail(session, lecture)
