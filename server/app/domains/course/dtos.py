@@ -31,3 +31,47 @@ class IntakeSessionView(BaseModel):
     goal: str
     questions: list[str]
     profile: LearnerProfile | None
+
+
+# --- Course generation ----------------------------------------------------
+
+
+class RoadmapLecture(BaseModel):
+    """One lecture as proposed by the architect step."""
+
+    title: str
+    summary: str
+    topics: list[str]
+
+
+class Roadmap(BaseModel):
+    """The architect's structured output: a course title + ordered lectures."""
+
+    title: str
+    lectures: list[RoadmapLecture]
+
+
+class LectureView(BaseModel):
+    id: UUID
+    position: int
+    title: str
+    summary: str
+    topics: list[str]
+    status: str
+
+
+class CourseView(BaseModel):
+    id: UUID
+    title: str
+    goal: str
+    status: str
+    lectures: list[LectureView]
+
+
+class CourseSummary(BaseModel):
+    """Lightweight shape for the 'my courses' list."""
+
+    id: UUID
+    title: str
+    goal: str
+    status: str

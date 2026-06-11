@@ -1,11 +1,19 @@
 """Course-domain persistence (plain async functions over an AsyncSession)."""
 
+from typing import Any
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains.course.dtos import IntakeSessionView, LearnerProfile
-from app.domains.course.models import IntakeSession
+from app.domains.course.dtos import (
+    CourseSummary,
+    CourseView,
+    IntakeSessionView,
+    LearnerProfile,
+    LectureView,
+)
+from app.domains.course.models import Course, IntakeSession, Lecture
 
 
 async def create_intake_session(
@@ -31,3 +39,88 @@ def to_view(intake: IntakeSession) -> IntakeSessionView:
         questions=intake.pending_questions,
         profile=LearnerProfile(**intake.profile) if intake.profile else None,
     )
+
+
+# --- Course / Lecture -----------------------------------------------------
+
+
+async def create_course(
+    session: AsyncSession,
+    *,
+    owner_user_id: UUID,
+    intake_session_id: UUID | None,
+    title: str,
+    goal: str,
+    learner_profile: dict[str, Any] | None,
+) -> Course:
+    course = Course(
+        owner_user_id=owner_user_id,
+        intake_session_id=intake_session_id,
+        title=title,
+        goal=goal,
+        learner_profile=learner_profile,
+    )
+    session.add(course)
+    await session.flush()
+    return course
+
+
+async def add_lecture(
+    session: AsyncSession,
+    *,
+    course_id: UUID,
+    position: int,
+    title: str,
+    summary: str,
+    topics: list[str],
+) -> Lecture:
+    lecture = Lecture(
+        course_id=course_id, position=position, title=title, summary=summary, topics=topics
+    )
+    session.add(lecture)
+    return lecture
+
+
+async def get_course(session: AsyncSession, course_id: UUID) -> Course | None:
+    return await session.get(Course, course_id)
+
+
+async def list_lectures(session: AsyncSession, course_id: UUID) -> list[Lecture]:
+    result = await session.execute(
+        select(Lecture).where(Lecture.course_id == course_id).order_by(Lecture.position)
+    )
+    return list(result.scalars().all())
+
+
+async def list_courses(session: AsyncSession, owner_user_id: UUID) -> list[Course]:
+    result = await session.execute(
+        select(Course)
+        .where(Course.owner_user_id == owner_user_id)
+        .order_by(Course.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+def to_lecture_view(lecture: Lecture) -> LectureView:
+    return LectureView(
+        id=lecture.id,
+        position=lecture.position,
+        title=lecture.title,
+        summary=lecture.summary,
+        topics=lecture.topics,
+        status=lecture.status,
+    )
+
+
+def to_course_view(course: Course, lectures: list[Lecture]) -> CourseView:
+    return CourseView(
+        id=course.id,
+        title=course.title,
+        goal=course.goal,
+        status=course.status,
+        lectures=[to_lecture_view(lecture) for lecture in lectures],
+    )
+
+
+def to_course_summary(course: Course) -> CourseSummary:
+    return CourseSummary(id=course.id, title=course.title, goal=course.goal, status=course.status)
