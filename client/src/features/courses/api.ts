@@ -1,11 +1,20 @@
 import { apiGet, apiPost } from '@/lib/apiClient'
-import type { Course, CourseSummary, IntakeSession, LectureDetail } from '@/features/courses/types'
+import type {
+  Course,
+  CourseSummary,
+  IntakeSession,
+  IntakeSummary,
+  LectureDetail,
+  QuizResult,
+  QuizView,
+} from '@/features/courses/types'
 
 // Intake
 export const startIntake = (goal: string) => apiPost<IntakeSession>('/intake', { goal })
 export const answerIntake = (id: string, answer: string) =>
   apiPost<IntakeSession>(`/intake/${id}/answer`, { answer })
 export const getIntake = (id: string) => apiGet<IntakeSession>(`/intake/${id}`)
+export const listIntakes = () => apiGet<IntakeSummary[]>('/intake')
 
 // Courses
 export const createCourse = (intakeId: string) =>
@@ -19,3 +28,9 @@ export const generateTopic = (lectureId: string, topicIndex: number) =>
   apiPost<LectureDetail>(`/lectures/${lectureId}/topics/${topicIndex}`)
 export const generateReferences = (lectureId: string) =>
   apiPost<LectureDetail>(`/lectures/${lectureId}/references`)
+
+// Quizzes
+export const generateQuiz = (lectureId: string, topicIndex: number) =>
+  apiPost<QuizView>(`/lectures/${lectureId}/topics/${topicIndex}/quiz`)
+export const attemptQuiz = (lectureId: string, topicIndex: number, answers: number[]) =>
+  apiPost<QuizResult>(`/lectures/${lectureId}/topics/${topicIndex}/quiz/attempt`, { answers })

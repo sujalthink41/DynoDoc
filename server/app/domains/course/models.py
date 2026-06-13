@@ -3,7 +3,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import JSON, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.platform.persistence.base import Base
@@ -80,3 +80,39 @@ class Reference(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     url: Mapped[str] = mapped_column(String(2048))
     title: Mapped[str] = mapped_column(String(500))
     position: Mapped[int] = mapped_column(Integer)
+
+
+class Quiz(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """An AI-generated multiple-choice quiz for one lesson (lecture + topic)."""
+
+    __tablename__ = "quizzes"
+    __table_args__ = (
+        UniqueConstraint("lecture_id", "topic_index", name="uq_quizzes_lecture_topic"),
+    )
+
+    lecture_id: Mapped[UUID] = mapped_column(
+        ForeignKey("lectures.id", ondelete="CASCADE"), index=True
+    )
+    topic_index: Mapped[int] = mapped_column(Integer)
+    # [{ "question": str, "options": [str, ...], "answer_index": int }]
+    questions: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+
+
+class LessonProgress(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """A learner's progress on one lesson (lecture + topic): best quiz score + pass."""
+
+    __tablename__ = "lesson_progress"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "lecture_id", "topic_index", name="uq_lesson_progress_user_lesson"
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    lecture_id: Mapped[UUID] = mapped_column(
+        ForeignKey("lectures.id", ondelete="CASCADE"), index=True
+    )
+    topic_index: Mapped[int] = mapped_column(Integer)
+    best_score: Mapped[int] = mapped_column(Integer, default=0)
+    passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)

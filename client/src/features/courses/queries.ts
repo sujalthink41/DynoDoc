@@ -10,6 +10,12 @@ export const courseKeys = {
   lecture: (id: string) => ['lectures', id] as const,
 }
 
+export const intakeKeys = {
+  all: ['intake'] as const,
+  history: () => [...intakeKeys.all, 'history'] as const,
+  session: (id: string) => [...intakeKeys.all, 'session', id] as const,
+}
+
 export const useCourses = () =>
   useQuery({ queryKey: courseKeys.list(), queryFn: api.listCourses })
 
@@ -19,12 +25,31 @@ export const useCourse = (id: string) =>
 export const useLecture = (id: string) =>
   useQuery({ queryKey: courseKeys.lecture(id), queryFn: () => api.getLecture(id) })
 
-export const useStartIntake = () => useMutation({ mutationFn: api.startIntake })
+export const useIntakeHistory = () =>
+  useQuery({ queryKey: intakeKeys.history(), queryFn: api.listIntakes })
 
-export const useAnswerIntake = () =>
-  useMutation({
-    mutationFn: ({ id, answer }: { id: string; answer: string }) => api.answerIntake(id, answer),
+export const useIntakeSession = (id: string | null) =>
+  useQuery({
+    queryKey: intakeKeys.session(id ?? ''),
+    queryFn: () => api.getIntake(id as string),
+    enabled: id !== null,
   })
+
+export const useStartIntake = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: api.startIntake,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: intakeKeys.history() }),
+  })
+}
+
+export const useAnswerIntake = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, answer }: { id: string; answer: string }) => api.answerIntake(id, answer),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: intakeKeys.history() }),
+  })
+}
 
 export const useCreateCourse = () => {
   const queryClient = useQueryClient()
@@ -49,5 +74,21 @@ export const useGenerateReferences = (lectureId: string) => {
     mutationFn: () => api.generateReferences(lectureId),
     onSuccess: (data: LectureDetail) =>
       queryClient.setQueryData(courseKeys.lecture(lectureId), data),
+  })
+}
+
+export const useGenerateQuiz = (lectureId: string) =>
+  useMutation({ mutationFn: (topicIndex: number) => api.generateQuiz(lectureId, topicIndex) })
+
+export const useAttemptQuiz = (lectureId: string) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ topicIndex, answers }: { topicIndex: number; answers: number[] }) =>
+      api.attemptQuiz(lectureId, topicIndex, answers),
+    onSuccess: () => {
+      // Progress + unlock state changed — refetch the lecture and course views.
+      void queryClient.invalidateQueries({ queryKey: courseKeys.lecture(lectureId) })
+      void queryClient.invalidateQueries({ queryKey: courseKeys.all })
+    },
   })
 }

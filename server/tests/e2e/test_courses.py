@@ -62,7 +62,9 @@ async def test_cannot_generate_course_from_incomplete_intake(
     client: AsyncClient, fake_text_generator: FakeTextGenerator
 ) -> None:
     await client.post("/api/v1/auth/dev-login", json={"email": "learner@example.com"})
-    fake_text_generator.queue(IntakeStep(is_complete=False, questions=["What's your level?"]))
+    fake_text_generator.queue(
+        IntakeStep(on_topic=True, is_complete=False, message="What's your level?")
+    )
     start = await client.post("/api/v1/intake", json={"goal": "Learn Python"})
     intake_id = start.json()["id"]
 

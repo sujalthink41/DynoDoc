@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Spinner } from '@/components/ui/Spinner'
 import { useAuth } from '@/features/auth/queries'
 import { useCourses } from '@/features/courses/queries'
@@ -36,6 +37,17 @@ export function DashboardPage() {
                   <p className="text-xs uppercase tracking-wider text-brand">{course.status}</p>
                   <h3 className="mt-1 font-display text-lg font-semibold text-fg">{course.title}</h3>
                   <p className="mt-1 line-clamp-2 text-sm text-muted">{course.goal}</p>
+                  <div className="mt-4 flex items-center gap-3">
+                    <ProgressBar value={course.completion_percent} className="flex-1" />
+                    <span className="text-xs font-semibold text-fg">
+                      {course.completion_percent}%
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted">
+                    {course.average_score > 0
+                      ? `Avg quiz score ${course.average_score}%`
+                      : 'No quizzes taken yet'}
+                  </p>
                 </Card>
               </Link>
             ))}

@@ -20,21 +20,25 @@ async def test_full_intake_flow(
 ) -> None:
     await _login(client)
 
-    # First turn: the AI asks questions.
+    # First turn: the AI asks one focused question.
     fake_text_generator.queue(
-        IntakeStep(is_complete=False, questions=["What's your experience?", "Hours per week?"])
+        IntakeStep(on_topic=True, is_complete=False, message="What's your experience so far?")
     )
     start = await client.post("/api/v1/intake", json={"goal": "Learn Python"})
     assert start.status_code == 201
     body = start.json()
     assert body["status"] == "in_progress"
-    assert body["questions"] == ["What's your experience?", "Hours per week?"]
+    # Transcript holds the goal then the assistant's single question.
+    assert [t["role"] for t in body["transcript"]] == ["user", "assistant"]
+    assert body["transcript"][-1]["content"] == "What's your experience so far?"
     intake_id = body["id"]
 
     # Second turn: the AI is satisfied and returns a profile.
     fake_text_generator.queue(
         IntakeStep(
+            on_topic=True,
             is_complete=True,
+            message="Perfect — building your plan!",
             profile=LearnerProfile(
                 experience_level="beginner",
                 background="none",
@@ -50,4 +54,37 @@ async def test_full_intake_flow(
     result = answered.json()
     assert result["status"] == "ready"
     assert result["profile"]["experience_level"] == "beginner"
-    assert result["questions"] == []
+
+
+async def test_off_topic_request_is_refused(
+    client: AsyncClient, fake_text_generator: FakeTextGenerator
+) -> None:
+    await _login(client)
+    fake_text_generator.queue(
+        IntakeStep(
+            on_topic=False,
+            is_complete=False,
+            message="DynoDoc only builds technical learning courses — try a tech topic!",
+        )
+    )
+    start = await client.post("/api/v1/intake", json={"goal": "Teach me to play guitar"})
+    body = start.json()
+    assert body["status"] == "in_progress"
+    assert body["profile"] is None
+    assert body["transcript"][-1]["role"] == "assistant"
+
+
+async def test_intake_history_lists_past_sessions(
+    client: AsyncClient, fake_text_generator: FakeTextGenerator
+) -> None:
+    await _login(client)
+    fake_text_generator.queue(IntakeStep(on_topic=True, is_complete=False, message="What level?"))
+    await client.post("/api/v1/intake", json={"goal": "Learn Rust"})
+
+    history = await client.get("/api/v1/intake")
+    assert history.status_code == 200
+    items = history.json()
+    assert len(items) == 1
+    assert items[0]["goal"] == "Learn Rust"
+    assert items[0]["status"] == "in_progress"
+    assert "created_at" in items[0]

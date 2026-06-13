@@ -2,22 +2,34 @@ import { apiUrl } from '@/lib/config'
 
 export class ApiError extends Error {
   readonly status: number
+  /** Machine-readable code from the RFC 9457 problem+json body, if present. */
+  readonly code?: string
 
-  constructor(status: number, message?: string) {
+  constructor(status: number, message?: string, code?: string) {
     super(message ?? `Request failed with status ${status}`)
     this.name = 'ApiError'
     this.status = status
+    this.code = code
   }
 }
 
 async function parse<T>(response: Response): Promise<T> {
+  const text = await response.text()
   if (!response.ok) {
-    throw new ApiError(response.status)
+    let code: string | undefined
+    let detail: string | undefined
+    try {
+      const problem = text ? JSON.parse(text) : undefined
+      code = problem?.code
+      detail = problem?.detail ?? problem?.title
+    } catch {
+      // non-JSON error body — fall back to the status message
+    }
+    throw new ApiError(response.status, detail, code)
   }
   if (response.status === 204) {
     return undefined as T
   }
-  const text = await response.text()
   return (text ? JSON.parse(text) : undefined) as T
 }
 
