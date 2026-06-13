@@ -200,3 +200,20 @@ class QuizResult(BaseModel):
     can_retake: bool  # may attempt again (only while not mastered)
     results: list[QuizResultItem]
     unlocked_next: bool
+
+
+# --- Ask DynoDoc (in-lesson tutor) ----------------------------------------
+
+
+class TutorTurn(BaseModel):
+    """One message in an in-lesson tutor conversation."""
+
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class TutorReply(BaseModel):
+    """The tutor agent's structured reply to a learner's question."""
+
+    on_topic: bool = True  # was the question about this lesson's technical topic?
+    answer: str

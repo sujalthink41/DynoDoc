@@ -127,3 +127,13 @@ export interface QuizResult {
   results: QuizResultItem[]
   unlocked_next: boolean
 }
+
+export interface TutorTurn {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface TutorReply {
+  on_topic: boolean
+  answer: string
+}

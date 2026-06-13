@@ -9,9 +9,9 @@ export function AppLayout() {
   const auth = useAuth()
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-line bg-elevated backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+    <div className="flex h-screen flex-col">
+      <header className="z-40 shrink-0 border-b border-line bg-elevated backdrop-blur">
+        <div className="flex items-center justify-between px-6 py-3">
           <Link to="/" className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand to-brand-2 font-display text-base font-bold text-white">
               D
@@ -28,7 +28,9 @@ export function AppLayout() {
           </div>
         </div>
       </header>
-      <Outlet />
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <Outlet />
+      </div>
     </div>
   )
 }

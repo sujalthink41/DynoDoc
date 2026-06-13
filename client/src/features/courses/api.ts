@@ -7,6 +7,8 @@ import type {
   LectureDetail,
   QuizResult,
   QuizView,
+  TutorReply,
+  TutorTurn,
 } from '@/features/courses/types'
 
 // Intake
@@ -34,3 +36,12 @@ export const generateQuiz = (lectureId: string, topicIndex: number) =>
   apiPost<QuizView>(`/lectures/${lectureId}/topics/${topicIndex}/quiz`)
 export const attemptQuiz = (lectureId: string, topicIndex: number, answers: number[]) =>
   apiPost<QuizResult>(`/lectures/${lectureId}/topics/${topicIndex}/quiz/attempt`, { answers })
+
+// Ask DynoDoc (in-lesson tutor)
+export const askTutor = (
+  lectureId: string,
+  topicIndex: number,
+  question: string,
+  history: TutorTurn[],
+) =>
+  apiPost<TutorReply>(`/lectures/${lectureId}/topics/${topicIndex}/ask`, { question, history })

@@ -10,6 +10,7 @@ from app.domains.course.dtos import (
     QuizSpec,
     Roadmap,
     RoadmapLecture,
+    TutorReply,
 )
 from app.shared.contracts.curation import ReferenceDraft
 from tests.fixtures.fakes import FakeLlm, FakeResourceCurator, FakeTextGenerator
@@ -207,3 +208,55 @@ async def test_find_resources_button(
     assert response.status_code == 200
     refs = response.json()["references"]
     assert [r["type"] for r in refs] == ["article", "youtube"]
+
+
+async def test_ask_tutor_answers_about_generated_lesson(
+    client: AsyncClient, fake_text_generator: FakeTextGenerator, fake_llm: FakeLlm
+) -> None:
+    lecture_id = await _make_course_with_lecture(client, fake_text_generator, fake_llm)
+    fake_llm.responses.append(DocDraft(title="Variables", content="# Variables").model_dump_json())
+    await client.post(f"/api/v1/lectures/{lecture_id}/topics/0")
+
+    fake_llm.responses.append(
+        TutorReply(
+            on_topic=True, answer="A variable names a value you can reuse."
+        ).model_dump_json()
+    )
+    response = await client.post(
+        f"/api/v1/lectures/{lecture_id}/topics/0/ask",
+        json={"question": "What is a variable?", "history": []},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["on_topic"] is True
+    assert "variable" in body["answer"].lower()
+
+
+async def test_ask_tutor_off_topic_is_refused(
+    client: AsyncClient, fake_text_generator: FakeTextGenerator, fake_llm: FakeLlm
+) -> None:
+    lecture_id = await _make_course_with_lecture(client, fake_text_generator, fake_llm)
+    fake_llm.responses.append(DocDraft(title="Variables", content="# Variables").model_dump_json())
+    await client.post(f"/api/v1/lectures/{lecture_id}/topics/0")
+
+    fake_llm.responses.append(
+        TutorReply(on_topic=False, answer="Let's keep it to this lesson!").model_dump_json()
+    )
+    response = await client.post(
+        f"/api/v1/lectures/{lecture_id}/topics/0/ask",
+        json={"question": "What's a good pasta recipe?"},
+    )
+    assert response.status_code == 200
+    assert response.json()["on_topic"] is False
+
+
+async def test_ask_tutor_requires_generated_lesson(
+    client: AsyncClient, fake_text_generator: FakeTextGenerator, fake_llm: FakeLlm
+) -> None:
+    lecture_id = await _make_course_with_lecture(client, fake_text_generator, fake_llm)
+    response = await client.post(
+        f"/api/v1/lectures/{lecture_id}/topics/0/ask",
+        json={"question": "explain this"},
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "lesson_not_generated"

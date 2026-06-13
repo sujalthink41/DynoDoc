@@ -99,7 +99,7 @@ export function IntakePage() {
   const selectedId = viewingId ?? liveSession?.id ?? null
 
   return (
-    <main className="flex h-[calc(100vh-57px)]">
+    <main className="flex h-full">
       <IntakeHistory
         items={history.data ?? []}
         selectedId={selectedId}

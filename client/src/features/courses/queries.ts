@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import * as api from '@/features/courses/api'
-import type { LectureDetail } from '@/features/courses/types'
+import type { LectureDetail, TutorTurn } from '@/features/courses/types'
 
 export const courseKeys = {
   all: ['courses'] as const,
@@ -92,3 +92,16 @@ export const useAttemptQuiz = (lectureId: string) => {
     },
   })
 }
+
+export const useAskTutor = (lectureId: string) =>
+  useMutation({
+    mutationFn: ({
+      topicIndex,
+      question,
+      history,
+    }: {
+      topicIndex: number
+      question: string
+      history: TutorTurn[]
+    }) => api.askTutor(lectureId, topicIndex, question, history),
+  })
