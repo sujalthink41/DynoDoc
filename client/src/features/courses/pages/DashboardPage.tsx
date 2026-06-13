@@ -14,7 +14,7 @@ export function DashboardPage() {
     auth.status === 'authenticated' ? (auth.user.display_name ?? auth.user.email).split(' ')[0] : ''
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-16">
+    <main className="px-6 py-16 sm:px-10">
       <h1 className="font-display text-3xl font-bold text-fg sm:text-4xl">
         Hey {firstName || 'there'}, what do you want to learn?
       </h1>
@@ -30,7 +30,7 @@ export function DashboardPage() {
             <Spinner />
           </div>
         ) : courses && courses.length > 0 ? (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {courses.map((course) => (
               <Link key={course.id} to={`/courses/${course.id}`}>
                 <Card className="p-5 transition hover:-translate-y-1 hover:border-brand/40">

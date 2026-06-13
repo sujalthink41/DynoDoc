@@ -13,6 +13,7 @@ from app.domains.course.dtos import (
     QuizResult,
     QuizResultItem,
     QuizView,
+    TutorReply,
 )
 from app.domains.course.models import Lecture
 from app.domains.course.progress import (
@@ -37,9 +38,11 @@ from app.entrypoints.http.deps import (
     require_principal,
 )
 from app.entrypoints.http.schemas.quiz import QuizAttemptRequest
+from app.entrypoints.http.schemas.tutor import AskRequest
 from app.processes.course_generation.curation import generate_lecture_references
 from app.processes.course_generation.quiz import generate_quiz
 from app.processes.course_generation.writer import generate_topic_doc
+from app.processes.tutoring.answer import answer_lesson_question
 from app.shared.contracts.curation import ResourceCurator
 from app.shared.errors import (
     ConflictError,
@@ -207,4 +210,27 @@ async def attempt_quiz_route(
         can_retake=not mastered,
         results=results,
         unlocked_next=passed,
+    )
+
+
+@router.post("/{lecture_id}/topics/{topic_index}/ask", response_model=TutorReply)
+async def ask_tutor_route(
+    lecture_id: UUID,
+    topic_index: int,
+    body: AskRequest,
+    user: User = Depends(require_principal),
+    session: AsyncSession = Depends(db_session),
+    model: BaseLlm = Depends(get_llm_model),
+) -> TutorReply:
+    lecture = await _load_owned_lecture(session, lecture_id, user)
+    _ensure_topic_in_range(lecture, topic_index)
+    if not body.question.strip():
+        raise ValidationError("Ask a question", code="empty_question")
+    return await answer_lesson_question(
+        session,
+        model=model,
+        lecture=lecture,
+        topic_index=topic_index,
+        question=body.question,
+        history=body.history,
     )
