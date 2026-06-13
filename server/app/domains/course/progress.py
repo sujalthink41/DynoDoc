@@ -19,6 +19,7 @@ from app.domains.course.dtos import (
     LessonState,
 )
 from app.domains.course.models import Course, Lecture
+from app.domains.gamification import repository as game_repo
 
 PASS_THRESHOLD = 80
 
@@ -44,6 +45,7 @@ async def compute_lessons(
     lectures = await repo.list_lectures(session, course_id)
     progress = await repo.list_lesson_progress_for_course(session, user_id, course_id)
     prog_map = {(p.lecture_id, p.topic_index): p for p in progress}
+    purchased = await game_repo.list_unlocked_lessons(session, user_id, course_id)
 
     lessons: list[LessonInfo] = []
     for lecture in lectures:
@@ -64,9 +66,11 @@ async def compute_lessons(
                 )
             )
 
+    # A lesson is readable if it's sequentially unlocked OR coin-purchased; a
+    # purchase grants read access only — it never advances the gate for the next.
     previous_passed = True
     for lesson in lessons:
-        lesson.unlocked = previous_passed
+        lesson.unlocked = previous_passed or (lesson.lecture_id, lesson.topic_index) in purchased
         previous_passed = lesson.passed
     return lessons
 

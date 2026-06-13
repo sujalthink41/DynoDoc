@@ -30,6 +30,8 @@ export const generateTopic = (lectureId: string, topicIndex: number) =>
   apiPost<LectureDetail>(`/lectures/${lectureId}/topics/${topicIndex}`)
 export const generateReferences = (lectureId: string) =>
   apiPost<LectureDetail>(`/lectures/${lectureId}/references`)
+export const unlockTopic = (lectureId: string, topicIndex: number) =>
+  apiPost<LectureDetail>(`/lectures/${lectureId}/topics/${topicIndex}/unlock`)
 
 // Quizzes
 export const generateQuiz = (lectureId: string, topicIndex: number) =>

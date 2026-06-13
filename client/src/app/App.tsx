@@ -6,6 +6,9 @@ import { CoursePage } from '@/features/courses/pages/CoursePage'
 import { DashboardPage } from '@/features/courses/pages/DashboardPage'
 import { IntakePage } from '@/features/courses/pages/IntakePage'
 import { LecturePage } from '@/features/courses/pages/LecturePage'
+import { ArcadePage } from '@/features/game/pages/ArcadePage'
+import { ConnectionsPage } from '@/features/game/pages/ConnectionsPage'
+import { LeaderboardPage } from '@/features/game/pages/LeaderboardPage'
 import { LandingPage } from '@/features/landing/LandingPage'
 import { ProfilePage } from '@/features/profile/ProfilePage'
 
@@ -20,6 +23,9 @@ function App() {
         <Route element={<RequireAuth />}>
           <Route element={<AppLayout />}>
             <Route path="/app" element={<DashboardPage />} />
+            <Route path="/games" element={<ArcadePage />} />
+            <Route path="/games/connections" element={<ConnectionsPage />} />
+            <Route path="/games/leaderboard" element={<LeaderboardPage />} />
             <Route path="/learn" element={<IntakePage />} />
             <Route path="/courses/:courseId" element={<CoursePage />} />
             <Route path="/lectures/:lectureId" element={<LecturePage />} />
