@@ -7,16 +7,22 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.course.dtos import (
-    CourseSummary,
-    CourseView,
     DocView,
     IntakeSessionView,
+    IntakeSummary,
     LearnerProfile,
-    LectureDetailView,
-    LectureView,
     ReferenceView,
+    TranscriptTurn,
 )
-from app.domains.course.models import Course, Doc, IntakeSession, Lecture, Reference
+from app.domains.course.models import (
+    Course,
+    Doc,
+    IntakeSession,
+    Lecture,
+    LessonProgress,
+    Quiz,
+    Reference,
+)
 
 
 async def create_intake_session(
@@ -34,13 +40,30 @@ async def get_intake_session(session: AsyncSession, intake_id: UUID) -> IntakeSe
     return await session.get(IntakeSession, intake_id)
 
 
+async def list_intake_sessions(session: AsyncSession, owner_user_id: UUID) -> list[IntakeSession]:
+    result = await session.execute(
+        select(IntakeSession)
+        .where(IntakeSession.owner_user_id == owner_user_id)
+        .order_by(IntakeSession.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
 def to_view(intake: IntakeSession) -> IntakeSessionView:
     return IntakeSessionView(
         id=intake.id,
         status=intake.status,
         goal=intake.goal,
-        questions=intake.pending_questions,
+        transcript=[
+            TranscriptTurn(role=turn["role"], content=turn["content"]) for turn in intake.transcript
+        ],
         profile=LearnerProfile(**intake.profile) if intake.profile else None,
+    )
+
+
+def to_intake_summary(intake: IntakeSession) -> IntakeSummary:
+    return IntakeSummary(
+        id=intake.id, goal=intake.goal, status=intake.status, created_at=intake.created_at
     )
 
 
@@ -104,31 +127,6 @@ async def list_courses(session: AsyncSession, owner_user_id: UUID) -> list[Cours
     return list(result.scalars().all())
 
 
-def to_lecture_view(lecture: Lecture) -> LectureView:
-    return LectureView(
-        id=lecture.id,
-        position=lecture.position,
-        title=lecture.title,
-        summary=lecture.summary,
-        topics=lecture.topics,
-        status=lecture.status,
-    )
-
-
-def to_course_view(course: Course, lectures: list[Lecture]) -> CourseView:
-    return CourseView(
-        id=course.id,
-        title=course.title,
-        goal=course.goal,
-        status=course.status,
-        lectures=[to_lecture_view(lecture) for lecture in lectures],
-    )
-
-
-def to_course_summary(course: Course) -> CourseSummary:
-    return CourseSummary(id=course.id, title=course.title, goal=course.goal, status=course.status)
-
-
 # --- Lectures & Docs ------------------------------------------------------
 
 
@@ -176,16 +174,67 @@ def to_reference_view(reference: Reference) -> ReferenceView:
     )
 
 
-def to_lecture_detail_view(
-    lecture: Lecture, docs: list[Doc], references: list[Reference]
-) -> LectureDetailView:
-    return LectureDetailView(
-        id=lecture.id,
-        position=lecture.position,
-        title=lecture.title,
-        summary=lecture.summary,
-        topics=lecture.topics,
-        status=lecture.status,
-        docs=[to_doc_view(doc) for doc in docs],
-        references=[to_reference_view(ref) for ref in references],
+# --- Quiz & lesson progress -----------------------------------------------
+
+
+async def get_quiz(session: AsyncSession, lecture_id: UUID, topic_index: int) -> Quiz | None:
+    result = await session.execute(
+        select(Quiz).where(Quiz.lecture_id == lecture_id, Quiz.topic_index == topic_index)
     )
+    return result.scalar_one_or_none()
+
+
+async def add_quiz(
+    session: AsyncSession, *, lecture_id: UUID, topic_index: int, questions: list[dict[str, Any]]
+) -> Quiz:
+    quiz = Quiz(lecture_id=lecture_id, topic_index=topic_index, questions=questions)
+    session.add(quiz)
+    await session.flush()
+    return quiz
+
+
+async def get_lesson_progress(
+    session: AsyncSession, user_id: UUID, lecture_id: UUID, topic_index: int
+) -> LessonProgress | None:
+    result = await session.execute(
+        select(LessonProgress).where(
+            LessonProgress.user_id == user_id,
+            LessonProgress.lecture_id == lecture_id,
+            LessonProgress.topic_index == topic_index,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def record_quiz_score(
+    session: AsyncSession, *, user_id: UUID, lecture_id: UUID, topic_index: int, score: int
+) -> LessonProgress:
+    progress = await get_lesson_progress(session, user_id, lecture_id, topic_index)
+    passed_now = score >= 80
+    if progress is None:
+        progress = LessonProgress(
+            user_id=user_id,
+            lecture_id=lecture_id,
+            topic_index=topic_index,
+            best_score=score,
+            passed=passed_now,
+            attempts=1,
+        )
+        session.add(progress)
+    else:
+        progress.best_score = max(progress.best_score, score)
+        progress.passed = progress.passed or passed_now
+        progress.attempts += 1
+    await session.flush()
+    return progress
+
+
+async def list_lesson_progress_for_course(
+    session: AsyncSession, user_id: UUID, course_id: UUID
+) -> list[LessonProgress]:
+    result = await session.execute(
+        select(LessonProgress)
+        .join(Lecture, Lecture.id == LessonProgress.lecture_id)
+        .where(Lecture.course_id == course_id, LessonProgress.user_id == user_id)
+    )
+    return list(result.scalars().all())

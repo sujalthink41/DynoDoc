@@ -7,13 +7,11 @@ from google.adk.models.base_llm import BaseLlm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.course.dtos import CourseSummary, CourseView
+from app.domains.course.progress import build_course_summary, build_course_view
 from app.domains.course.repository import (
     get_course,
     get_intake_session,
     list_courses,
-    list_lectures,
-    to_course_summary,
-    to_course_view,
 )
 from app.domains.user.models import User
 from app.entrypoints.http.deps import db_session, get_llm_model, require_principal
@@ -45,8 +43,7 @@ async def create_course_route(
         goal=intake.goal,
         profile=intake.profile,
     )
-    lectures = await list_lectures(session, course.id)
-    return to_course_view(course, lectures)
+    return await build_course_view(session, user_id=user.id, course=course)
 
 
 @router.get("", response_model=list[CourseSummary])
@@ -55,7 +52,9 @@ async def list_my_courses(
     session: AsyncSession = Depends(db_session),
 ) -> list[CourseSummary]:
     courses = await list_courses(session, user.id)
-    return [to_course_summary(course) for course in courses]
+    return [
+        await build_course_summary(session, user_id=user.id, course=course) for course in courses
+    ]
 
 
 @router.get("/{course_id}", response_model=CourseView)
@@ -67,5 +66,4 @@ async def get_course_route(
     course = await get_course(session, course_id)
     if course is None or course.owner_user_id != user.id:
         raise NotFoundError("Course not found", code="course_not_found")
-    lectures = await list_lectures(session, course.id)
-    return to_course_view(course, lectures)
+    return await build_course_view(session, user_id=user.id, course=course)

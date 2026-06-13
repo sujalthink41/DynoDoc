@@ -5,8 +5,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains.course.dtos import IntakeSessionView
-from app.domains.course.repository import get_intake_session, to_view
+from app.domains.course.dtos import IntakeSessionView, IntakeSummary
+from app.domains.course.repository import (
+    get_intake_session,
+    list_intake_sessions,
+    to_intake_summary,
+    to_view,
+)
 from app.domains.course.service import IntakeService
 from app.domains.user.models import User
 from app.entrypoints.http.deps import db_session, get_text_generator, require_principal
@@ -15,6 +20,15 @@ from app.shared.contracts.llm import TextGenerator
 from app.shared.errors import NotFoundError
 
 router = APIRouter(prefix="/intake", tags=["intake"])
+
+
+@router.get("", response_model=list[IntakeSummary])
+async def list_intakes(
+    user: User = Depends(require_principal),
+    session: AsyncSession = Depends(db_session),
+) -> list[IntakeSummary]:
+    sessions = await list_intake_sessions(session, user.id)
+    return [to_intake_summary(intake) for intake in sessions]
 
 
 @router.post("", response_model=IntakeSessionView, status_code=status.HTTP_201_CREATED)
