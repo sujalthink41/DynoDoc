@@ -41,6 +41,18 @@ class CoinTxnView(BaseModel):
     created_at: datetime
 
 
+class DailySettleAward(BaseModel):
+    rank: int
+    coins: int
+
+
+class DailySettleView(BaseModel):
+    """Result of settling a day's leaderboard payout."""
+
+    day: date
+    awards: list[DailySettleAward]
+
+
 class RedemptionView(BaseModel):
     """One merch redemption in the learner's history."""
 

@@ -18,6 +18,7 @@ const REASON_LABEL: Record<string, string> = {
   connections: 'Connections',
   unlock_lesson: 'Unlocked a lesson',
   daily_visit: 'Daily visit',
+  daily_rank: '🏆 Daily leaderboard prize',
   lesson_complete: 'Lesson completed',
   course_complete: 'Course completed',
   extra_course: 'Extra course slot',

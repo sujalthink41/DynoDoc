@@ -29,7 +29,7 @@ from tests.fixtures.fakes import FakeLlm, FakeResourceCurator, FakeTextGenerator
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(environment="test", debug=True)
+    return Settings(environment="test", debug=True, settle_secret="test-secret")
 
 
 @pytest.fixture

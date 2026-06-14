@@ -1,8 +1,9 @@
 """Gamification routes — DynoCoin wallet, Connections game, and the leaderboard."""
 
-from datetime import date
+import secrets
+from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.gamification import connections as conn
@@ -13,6 +14,8 @@ from app.domains.gamification.dtos import (
     ConnectionsView,
     ConnGroupView,
     DailyBonusView,
+    DailySettleAward,
+    DailySettleView,
     LeaderboardEntry,
     LeaderboardView,
     PlayerView,
@@ -38,6 +41,7 @@ from app.domains.gamification.repository import (
     list_redemptions,
     player_rank,
     redeem_reward,
+    settle_daily_leaderboard,
     to_player_view,
     to_txn_view,
 )
@@ -45,7 +49,14 @@ from app.domains.user.models import User
 from app.entrypoints.http.deps import db_session, require_principal
 from app.entrypoints.http.schemas.connections import ConnectionsAttemptRequest
 from app.entrypoints.http.schemas.reward import RedeemRequest
-from app.shared.errors import ConflictError, NotFoundError, ValidationError
+from app.runtime.settings import Settings, get_settings
+from app.shared.errors import (
+    ConflictError,
+    DependencyUnavailableError,
+    NotFoundError,
+    PermissionDeniedError,
+    ValidationError,
+)
 
 router = APIRouter(prefix="/game", tags=["gamification"])
 
@@ -287,6 +298,34 @@ async def redeem_reward_route(
     )
     played = await get_play(session, user.id, conn.GAME_KEY, date.today())
     return to_player_view(profile, played_today=played is not None)
+
+
+@router.post("/settle-daily", response_model=DailySettleView)
+async def settle_daily_route(
+    target: str | None = Query(None, alias="date"),
+    x_settle_secret: str | None = Header(None),
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(db_session),
+) -> DailySettleView:
+    """Award the nightly leaderboard bonus. Called by a scheduled job (cron).
+
+    Guarded by a shared secret instead of a user session. With no ?date, it
+    settles the day that just ended (yesterday in the server's timezone), which
+    is what the midnight cron wants.
+    """
+    if not settings.settle_secret:
+        raise DependencyUnavailableError(
+            "Leaderboard settlement is not configured", code="settle_unavailable"
+        )
+    if not secrets.compare_digest(x_settle_secret or "", settings.settle_secret):
+        raise PermissionDeniedError("Invalid settlement secret", code="bad_settle_secret")
+
+    day = date.fromisoformat(target) if target else date.today() - timedelta(days=1)
+    awarded = await settle_daily_leaderboard(session, game_key=conn.GAME_KEY, day=day)
+    return DailySettleView(
+        day=day,
+        awards=[DailySettleAward(rank=rank, coins=coins) for _, rank, coins in awarded],
+    )
 
 
 @router.post("/course-slot", response_model=PlayerView)

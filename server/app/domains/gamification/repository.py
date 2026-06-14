@@ -25,6 +25,8 @@ LESSON_COMPLETE_REWARD = 5  # passing a lesson's quiz (first time)
 COURSE_COMPLETE_REWARD = 100  # finishing a whole course (first time)
 UNLOCK_COST = 100  # spend to read-unlock a locked lesson
 EXTRA_COURSE_COST = 500  # spend to earn one extra course slot beyond the free limit
+DAILY_PAYOUTS = (50, 30, 20)  # nightly bonus for the daily leaderboard's top 3
+DAILY_RANK_REASON = "daily_rank"
 
 
 async def get_or_create_profile(session: AsyncSession, user_id: UUID) -> PlayerProfile:
@@ -216,6 +218,43 @@ async def daily_leaderboard(
         .limit(limit)
     )
     return [(row[0], row[1]) for row in result.all()]
+
+
+async def settle_daily_leaderboard(
+    session: AsyncSession,
+    *,
+    game_key: str,
+    day: date,
+    payouts: tuple[int, ...] = DAILY_PAYOUTS,
+) -> list[tuple[UUID, int, int]]:
+    """Award the nightly bonus to `day`'s top finishers. Idempotent per day.
+
+    Only players who actually solved the puzzle are paid. Returns the list of
+    (user_id, rank, coins) granted (empty if already settled or nobody solved).
+    """
+    already = await session.execute(
+        select(CoinTxn.id)
+        .where(CoinTxn.reason == DAILY_RANK_REASON, CoinTxn.ref.like(f"{day}#%"))
+        .limit(1)
+    )
+    if already.scalar_one_or_none() is not None:
+        return []  # this day was already settled
+
+    rows = await daily_leaderboard(session, game_key, day, limit=len(payouts))
+    awarded: list[tuple[UUID, int, int]] = []
+    for index, (play, owner) in enumerate(rows):
+        if not play.solved:
+            continue  # no prize for an unsolved board
+        coins = payouts[index]
+        await award_coins(
+            session,
+            user_id=owner.id,
+            amount=coins,
+            reason=DAILY_RANK_REASON,
+            ref=f"{day}#{index + 1}",
+        )
+        awarded.append((owner.id, index + 1, coins))
+    return awarded
 
 
 async def daily_play_rank(

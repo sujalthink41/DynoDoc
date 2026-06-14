@@ -94,6 +94,14 @@ export function AppLayout() {
           </div>
 
           <div className="flex items-center gap-3">
+            {authed && (
+              <Link
+                to="/pricing"
+                className="hidden items-center gap-1 rounded-full bg-gradient-to-r from-brand to-brand-2 px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm shadow-brand/30 transition hover:opacity-90 sm:inline-flex"
+              >
+                ✨ Upgrade
+              </Link>
+            )}
             <PlayerChips />
             <ThemeToggle />
             {authed && (
