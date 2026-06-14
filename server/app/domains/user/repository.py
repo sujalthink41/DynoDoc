@@ -12,7 +12,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.user.dtos import Principal
-from app.domains.user.models import User
+from app.domains.user.models import User, UserPersona
+from app.domains.user.persona import known_keys
 from app.shared.contracts.identity import GoogleIdentity
 
 
@@ -27,6 +28,28 @@ def to_principal(user: User) -> Principal:
 
 async def get_user_by_id(session: AsyncSession, user_id: UUID) -> User | None:
     return await session.get(User, user_id)
+
+
+async def get_or_create_persona(session: AsyncSession, user_id: UUID) -> UserPersona:
+    result = await session.execute(select(UserPersona).where(UserPersona.user_id == user_id))
+    persona = result.scalar_one_or_none()
+    if persona is None:
+        persona = UserPersona(user_id=user_id, answers={})
+        session.add(persona)
+        await session.flush()
+    return persona
+
+
+async def save_persona(
+    session: AsyncSession, user_id: UUID, answers: dict[str, str]
+) -> UserPersona:
+    """Merge incoming answers (known keys only) into the learner's persona."""
+    persona = await get_or_create_persona(session, user_id)
+    updates = {k: v.strip() for k, v in answers.items() if k in known_keys()}
+    # Reassign (not mutate) so SQLAlchemy detects the JSON change.
+    persona.answers = {**persona.answers, **updates}
+    await session.flush()
+    return persona
 
 
 async def get_or_create_oauth_user(

@@ -120,7 +120,7 @@ export function LeaderboardPage() {
   const inTop = board?.top.some((e) => e.is_me)
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
+    <main className="mx-auto max-w-3xl">
       <Breadcrumb
         items={[
           { label: 'Home', to: '/app', icon: <HomeIcon /> },

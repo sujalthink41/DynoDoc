@@ -38,7 +38,8 @@ class Settings(BaseSettings):
     google_client_id: str | None = None
     google_client_secret: str | None = None
     google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
-    frontend_post_login_url: str = "http://localhost:3000"
+    # Where to land users after a successful sign-in — the app, not the marketing page.
+    frontend_post_login_url: str = "http://localhost:3000/app"
 
     # LLM (provider-agnostic via LiteLLM). Switching provider/model later is just
     # config. Optional until set — the app degrades to 503 on AI endpoints.

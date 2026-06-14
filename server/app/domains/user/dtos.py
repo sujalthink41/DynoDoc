@@ -22,3 +22,22 @@ class UserProfile(BaseModel):
     display_name: str | None
     avatar_url: str | None
     is_active: bool
+
+
+class PersonaQuestionView(BaseModel):
+    key: str
+    prompt: str
+    emoji: str
+    kind: str  # "choice" | "text"
+    options: list[str]
+    allow_custom: bool
+    answer: str
+
+
+class PersonaView(BaseModel):
+    """The 'about you' questionnaire with the learner's answers + completion."""
+
+    questions: list[PersonaQuestionView]
+    answered: int
+    total: int
+    percent: int

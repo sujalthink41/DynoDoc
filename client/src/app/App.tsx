@@ -9,7 +9,9 @@ import { LecturePage } from '@/features/courses/pages/LecturePage'
 import { ArcadePage } from '@/features/game/pages/ArcadePage'
 import { ConnectionsPage } from '@/features/game/pages/ConnectionsPage'
 import { LeaderboardPage } from '@/features/game/pages/LeaderboardPage'
+import { RewardsPage } from '@/features/game/pages/RewardsPage'
 import { LandingPage } from '@/features/landing/LandingPage'
+import { PricingPage } from '@/features/pricing/PricingPage'
 import { ProfilePage } from '@/features/profile/ProfilePage'
 
 function App() {
@@ -26,9 +28,11 @@ function App() {
             <Route path="/games" element={<ArcadePage />} />
             <Route path="/games/connections" element={<ConnectionsPage />} />
             <Route path="/games/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/games/rewards" element={<RewardsPage />} />
             <Route path="/learn" element={<IntakePage />} />
             <Route path="/courses/:courseId" element={<CoursePage />} />
             <Route path="/lectures/:lectureId" element={<LecturePage />} />
+            <Route path="/pricing" element={<PricingPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Route>

@@ -80,10 +80,9 @@ async def test_connections_solve_awards_coins_and_streak(client: AsyncClient) ->
     result = attempt.json()
     assert result["solved"] is True
     assert result["correct_groups"] == 4
-    # 8/group * 4 + 18 solve bonus + 15 speed (<=30s) = 65, day-1 streak (no milestone).
-    assert result["coins_awarded"] == 65
+    assert result["coins_awarded"] == 10  # flat 10 for a solve
     assert result["current_streak"] == 1
-    assert result["new_balance"] == 65
+    assert result["new_balance"] == 10
     assert len(result["groups"]) == 4  # answer key revealed after submit
 
     # Replaying the same day is blocked.
@@ -93,7 +92,7 @@ async def test_connections_solve_awards_coins_and_streak(client: AsyncClient) ->
 
     profile = (await client.get("/api/v1/game/profile")).json()
     assert profile["played_today"] is True
-    assert profile["lifetime_coins"] == 65
+    assert profile["lifetime_coins"] == 10
 
 
 async def test_leaderboards_all_time_and_today(client: AsyncClient) -> None:
@@ -107,7 +106,7 @@ async def test_leaderboards_all_time_and_today(client: AsyncClient) -> None:
     all_time = (await client.get("/api/v1/game/leaderboard?period=all")).json()
     assert all_time["period"] == "all"
     assert all_time["me"]["is_me"] is True
-    assert all_time["me"]["coins"] == 65
+    assert all_time["me"]["coins"] == 10
     assert any(entry["is_me"] for entry in all_time["top"])
 
     today = (await client.get("/api/v1/game/leaderboard?period=today")).json()
@@ -131,7 +130,8 @@ async def test_quiz_pass_and_mastery_award_coins(
         f"/api/v1/lectures/{lecture_id}/topics/0/quiz/attempt", json={"answers": [1, 1, 1, 1, 1]}
     )
     profile = (await client.get("/api/v1/game/profile")).json()
-    assert profile["coins"] == 40  # pass (15) + mastery (25)
+    # Lesson complete = 5 (the 2-lesson course isn't fully done yet, so no +100).
+    assert profile["coins"] == 5
 
 
 async def test_unlock_requires_enough_coins(

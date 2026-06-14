@@ -66,7 +66,7 @@ export function ConnectionsPage() {
   // Already played today (and no fresh result this session).
   if (data.played && !result) {
     return (
-      <main className="mx-auto max-w-xl px-6 py-12 text-center">
+      <main className="mx-auto max-w-xl text-center">
         {crumb}
         <Card className="mt-8 p-8">
           <span className="text-5xl">{data.solved ? '🏆' : '🧩'}</span>
@@ -87,7 +87,7 @@ export function ConnectionsPage() {
   // Result screen.
   if (result) {
     return (
-      <main className="mx-auto max-w-xl px-6 py-12 text-center">
+      <main className="mx-auto max-w-xl text-center">
         {crumb}
         <Card className="mt-8 p-8">
           <span className="text-5xl">{result.solved ? '🎉' : '🧩'}</span>
@@ -169,7 +169,7 @@ export function ConnectionsPage() {
   const canSubmit = locked.length === groupCount
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-8">
+    <main className="mx-auto max-w-2xl">
       {crumb}
       <div className="mt-6 flex items-start justify-between gap-3">
         <div>

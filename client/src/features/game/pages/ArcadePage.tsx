@@ -1,26 +1,12 @@
-import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 import { Breadcrumb, HomeIcon } from '@/components/ui/Breadcrumb'
 import { DynoCoin } from '@/components/ui/DynoCoin'
-import { useConnections, useLeaderboard, useProfile } from '@/features/game/queries'
+import { useConnections, useLeaderboard } from '@/features/game/queries'
 
 const MEDALS = ['🥇', '🥈', '🥉']
 
-function StatChip({ icon, value, label }: { icon: ReactNode; value: ReactNode; label: string }) {
-  return (
-    <div className="flex items-center gap-3 rounded-2xl border border-line bg-elevated/70 px-4 py-3 backdrop-blur-xl">
-      <span className="flex h-7 w-7 items-center justify-center text-2xl">{icon}</span>
-      <div>
-        <p className="font-display text-xl font-bold leading-none text-fg">{value}</p>
-        <p className="mt-1 text-xs text-muted">{label}</p>
-      </div>
-    </div>
-  )
-}
-
 export function ArcadePage() {
-  const { data: player } = useProfile()
   const { data: connections } = useConnections(true)
   const { data: board } = useLeaderboard('all', true)
   const played = connections?.played
@@ -38,37 +24,42 @@ export function ArcadePage() {
       />
       <div aria-hidden className="pointer-events-none absolute inset-0 text-muted/40 [mask-image:linear-gradient(to_bottom,black,transparent_60%)] bg-dots" />
 
-      <div className="relative px-6 py-10 sm:px-10">
+      <div className="relative mx-auto w-full max-w-7xl px-6 py-10 sm:px-10">
         <Breadcrumb
           items={[{ label: 'Home', to: '/app', icon: <HomeIcon /> }, { label: 'Games' }]}
         />
 
         {/* Hero */}
-        <div className="mt-6 flex flex-wrap items-end justify-between gap-6">
-          <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
-              🎮 DynoArcade
-            </span>
-            <h1 className="mt-3 font-display text-4xl font-bold tracking-tight text-fg sm:text-5xl">
-              Play. Earn. <span className="bg-gradient-to-r from-brand to-brand-2 bg-clip-text text-transparent">Climb.</span>
-            </h1>
-            <p className="mt-3 max-w-md text-muted">
-              One quick puzzle a day. Build your streak, stack DynoCoins, and rise up the
-              leaderboard.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <StatChip icon="🔥" value={player?.current_streak ?? 0} label="day streak" />
-            <StatChip
-              icon={<DynoCoin className="h-7 w-7" />}
-              value={player?.coins ?? 0}
-              label="coins"
-            />
-            <StatChip icon="⭐" value={player?.lifetime_coins ?? 0} label="lifetime" />
-          </div>
+        <div className="mt-6">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">
+            🎮 DynoArcade
+          </span>
+          <h1 className="mt-3 font-display text-4xl font-bold tracking-tight text-fg sm:text-5xl">
+            Play. Earn. <span className="bg-gradient-to-r from-brand to-brand-2 bg-clip-text text-transparent">Climb.</span>
+          </h1>
+          <p className="mt-3 max-w-md text-muted">
+            One quick puzzle a day. Build your streak, stack DynoCoins, and rise up the
+            leaderboard.
+          </p>
         </div>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_22rem]">
+        {/* Quick links */}
+        <div className="mt-6 flex flex-wrap gap-2">
+          <Link
+            to="/games/leaderboard"
+            className="rounded-full border border-line bg-elevated/70 px-4 py-2 text-sm font-medium text-fg transition hover:border-brand/40"
+          >
+            🏆 Leaderboard
+          </Link>
+          <Link
+            to="/games/rewards"
+            className="rounded-full border border-line bg-elevated/70 px-4 py-2 text-sm font-medium text-fg transition hover:border-brand/40"
+          >
+            🎁 Rewards shop
+          </Link>
+        </div>
+
+        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_22rem]">
           {/* Featured game */}
           <section>
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
