@@ -1,6 +1,9 @@
 /** Runtime configuration, sourced from Vite env vars (VITE_*). One source of truth. */
-export const API_BASE_URL: string =
-  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+// Default to "" → relative URLs (/api/v1/...). In prod the host proxies /api to
+// the backend (see netlify _redirects); in dev Vite proxies it (see vite.config).
+// Keeping the API same-origin makes the session cookie first-party, which avoids
+// third-party-cookie blocking. Set VITE_API_BASE_URL only to force an absolute URL.
+export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? ''
 
 export const API_PREFIX = '/api/v1'
 

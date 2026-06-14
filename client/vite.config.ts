@@ -13,7 +13,11 @@ export default defineConfig({
     },
   },
   server: {
-    // Match the backend's CORS allow-list and OAuth post-login redirect.
     port: 3000,
+    // Proxy /api to the local backend so the frontend can use same-origin
+    // relative URLs in dev too (matching the prod Netlify proxy).
+    proxy: {
+      '/api': 'http://localhost:8000',
+    },
   },
 })

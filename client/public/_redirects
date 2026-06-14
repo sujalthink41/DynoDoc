@@ -1,1 +1,4 @@
-/*    /index.html   200
+# Proxy API calls to the backend so they're same-origin (first-party cookie).
+/api/*  https://dynodoc.onrender.com/api/:splat  200
+# SPA fallback — every other path serves the app shell.
+/*      /index.html   200
