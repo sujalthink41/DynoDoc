@@ -30,6 +30,15 @@ from app.domains.course.repository import (
     list_references,
     record_quiz_score,
 )
+from app.domains.gamification.repository import (
+    MASTERY_BONUS,
+    QUIZ_PASS_REWARD,
+    UNLOCK_COST,
+    add_lesson_unlock,
+    award_coins,
+    get_lesson_unlock,
+    spend_coins,
+)
 from app.domains.user.models import User
 from app.entrypoints.http.deps import (
     db_session,
@@ -180,6 +189,8 @@ async def attempt_quiz_route(
     existing = await get_lesson_progress(session, user.id, lecture.id, topic_index)
     if existing is not None and existing.best_score >= MASTERY_SCORE:
         raise ConflictError("You've already mastered this quiz", code="quiz_mastered")
+    was_passed = existing is not None and existing.passed
+    prev_best = existing.best_score if existing is not None else 0
 
     total = len(quiz.questions)
     correct_flags = [
@@ -194,6 +205,15 @@ async def attempt_quiz_route(
         session, user_id=user.id, lecture_id=lecture.id, topic_index=topic_index, score=score
     )
     mastered = progress.best_score >= MASTERY_SCORE
+
+    # DynoCoins: reward the FIRST pass and the FIRST mastery (no farming via retries).
+    ref = f"{lecture.id}:{topic_index}"
+    if not was_passed and progress.passed:
+        await award_coins(
+            session, user_id=user.id, amount=QUIZ_PASS_REWARD, reason="quiz_pass", ref=ref
+        )
+    if prev_best < MASTERY_SCORE and progress.best_score >= MASTERY_SCORE:
+        await award_coins(session, user_id=user.id, amount=MASTERY_BONUS, reason="mastery", ref=ref)
 
     # Correct answers are revealed only on mastery — never on a failing/partial pass.
     answers = _answer_indices(quiz.questions)
@@ -234,3 +254,29 @@ async def ask_tutor_route(
         question=body.question,
         history=body.history,
     )
+
+
+@router.post("/{lecture_id}/topics/{topic_index}/unlock", response_model=LectureDetailView)
+async def unlock_lesson_route(
+    lecture_id: UUID,
+    topic_index: int,
+    user: User = Depends(require_principal),
+    session: AsyncSession = Depends(db_session),
+) -> LectureDetailView:
+    """Spend DynoCoins to read-unlock a locked lesson (the quiz still gates progress)."""
+    lecture = await _load_owned_lecture(session, lecture_id, user)
+    _ensure_topic_in_range(lecture, topic_index)
+
+    already_open = await is_lesson_unlocked(
+        session, user_id=user.id, lecture=lecture, topic_index=topic_index
+    )
+    purchased = await get_lesson_unlock(session, user.id, lecture.id, topic_index)
+    if not already_open and purchased is None:
+        ref = f"{lecture.id}:{topic_index}"
+        await spend_coins(
+            session, user_id=user.id, amount=UNLOCK_COST, reason="unlock_lesson", ref=ref
+        )
+        await add_lesson_unlock(
+            session, user_id=user.id, lecture_id=lecture.id, topic_index=topic_index
+        )
+    return await _detail(session, user=user, lecture=lecture)

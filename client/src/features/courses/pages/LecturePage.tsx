@@ -8,11 +8,19 @@ import { AIThinking } from '@/components/ui/AIThinking'
 import { Breadcrumb, HomeIcon } from '@/components/ui/Breadcrumb'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { DynoCoin } from '@/components/ui/DynoCoin'
 import { Spinner } from '@/components/ui/Spinner'
 import { useAuth } from '@/features/auth/queries'
 import { AskDynoDoc } from '@/features/courses/components/AskDynoDoc'
 import { QuizPanel } from '@/features/courses/components/QuizPanel'
-import { useGenerateReferences, useGenerateTopic, useLecture } from '@/features/courses/queries'
+import { LESSON_UNLOCK_COST } from '@/features/game/constants'
+import { useProfile } from '@/features/game/queries'
+import {
+  useGenerateReferences,
+  useGenerateTopic,
+  useLecture,
+  useUnlockTopic,
+} from '@/features/courses/queries'
 import type { DocView, LessonState, ReferenceView } from '@/features/courses/types'
 import { ApiError } from '@/lib/apiClient'
 
@@ -139,8 +147,10 @@ export function LecturePage() {
       : 'Y'
 
   const { data: lecture, isPending } = useLecture(lectureId)
+  const { data: player } = useProfile()
   const generateTopic = useGenerateTopic(lectureId)
   const generateReferences = useGenerateReferences(lectureId)
+  const unlockTopic = useUnlockTopic(lectureId)
   const [selected, setSelected] = useState<number | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
   const [navOpen, setNavOpen] = useState(false) // lessons drawer on small screens
@@ -175,16 +185,26 @@ export function LecturePage() {
   }
 
   const selectLesson = (lesson: LessonState) => {
-    if (!lesson.unlocked) {
-      toast.error('🔒 Pass the previous lesson’s quiz to unlock this lesson.')
-      return
-    }
     setQuote(null) // a quote from the previous lesson shouldn't carry over
     setSelected(lesson.index)
     setNavOpen(false) // close the lessons drawer after picking (mobile)
-    if (!docFor(lesson.index) && generateTopic.variables !== lesson.index) {
+    // Locked lessons open to an unlock card instead of generating.
+    if (lesson.unlocked && !docFor(lesson.index) && generateTopic.variables !== lesson.index) {
       generate(lesson.index)
     }
+  }
+
+  const unlockAndGenerate = (index: number) => {
+    unlockTopic.mutate(index, {
+      onSuccess: () => generate(index),
+      onError: (error) => {
+        if (error instanceof ApiError && error.code === 'insufficient_coins') {
+          toast.error('Not enough DynoCoins — play Connections or pass quizzes to earn more.')
+        } else {
+          toast.error('Could not unlock this lesson. Try again.')
+        }
+      },
+    })
   }
 
   const askAboutSelection = (text: string) => {
@@ -322,6 +342,34 @@ export function LecturePage() {
                   )}
                 </section>
               </>
+            ) : selectedLesson && !selectedLesson.unlocked ? (
+              <Card className="p-10 text-center">
+                <span className="text-4xl">🔒</span>
+                <h3 className="mt-3 font-display text-xl font-semibold text-fg">
+                  This lesson is locked
+                </h3>
+                <p className="mx-auto mt-2 max-w-md text-muted">
+                  Pass the previous lesson’s quiz to unlock it the normal way — or jump ahead now by
+                  spending DynoCoins. (You’ll still need the quiz to complete it.)
+                </p>
+                <Button
+                  onClick={() => unlockAndGenerate(selected)}
+                  disabled={unlockTopic.isPending || generateTopic.variables === selected}
+                  className="mt-6 gap-1.5 px-6 py-3"
+                >
+                  {unlockTopic.isPending ? (
+                    'Unlocking…'
+                  ) : (
+                    <>
+                      Unlock for {LESSON_UNLOCK_COST} <DynoCoin className="h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+                <p className="mt-3 flex items-center justify-center gap-1 text-xs text-muted">
+                  You have <DynoCoin className="h-3.5 w-3.5" /> {player?.coins ?? 0} · earn more by
+                  playing Connections &amp; passing quizzes.
+                </p>
+              </Card>
             ) : (
               <Card className="p-10 text-center">
                 <p className="text-muted">This lesson hasn't been generated yet.</p>

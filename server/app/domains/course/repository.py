@@ -149,6 +149,24 @@ async def list_docs(session: AsyncSession, lecture_id: UUID) -> list[Doc]:
     return list(result.scalars().all())
 
 
+async def list_recent_user_docs(
+    session: AsyncSession, owner_user_id: UUID, limit: int = 6
+) -> list[Doc]:
+    """The learner's most recently generated lesson docs, across all their courses.
+
+    Used to build the Daily Dino Dash from material they've actually studied.
+    """
+    result = await session.execute(
+        select(Doc)
+        .join(Lecture, Lecture.id == Doc.lecture_id)
+        .join(Course, Course.id == Lecture.course_id)
+        .where(Course.owner_user_id == owner_user_id)
+        .order_by(Doc.created_at.desc())
+        .limit(limit)
+    )
+    return list(result.scalars().all())
+
+
 async def add_reference(
     session: AsyncSession, *, lecture_id: UUID, position: int, type: str, url: str, title: str
 ) -> Reference:

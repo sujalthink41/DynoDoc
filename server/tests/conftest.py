@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 import app.domains.course.models  # registers tables on Base.metadata
+import app.domains.gamification.models  # registers tables on Base.metadata
 import app.domains.user.models  # noqa: F401  (register tables on Base.metadata)
 from app.entrypoints.http.deps import (
     get_database,

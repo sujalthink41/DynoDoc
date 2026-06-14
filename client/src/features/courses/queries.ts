@@ -77,6 +77,18 @@ export const useGenerateReferences = (lectureId: string) => {
   })
 }
 
+export const useUnlockTopic = (lectureId: string) => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (topicIndex: number) => api.unlockTopic(lectureId, topicIndex),
+    onSuccess: (data: LectureDetail) => {
+      queryClient.setQueryData(courseKeys.lecture(lectureId), data)
+      // Coin balance changed — refresh the wallet/streak chips.
+      void queryClient.invalidateQueries({ queryKey: ['game', 'profile'] })
+    },
+  })
+}
+
 export const useGenerateQuiz = (lectureId: string) =>
   useMutation({ mutationFn: (topicIndex: number) => api.generateQuiz(lectureId, topicIndex) })
 
