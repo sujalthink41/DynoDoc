@@ -32,7 +32,7 @@ There's a small chicken-and-egg: the API needs the SPA's URL (CORS, post-login) 
    | `DYNODOC_FRONTEND_POST_LOGIN_URL` | `https://PLACEHOLDER.vercel.app/app` (fix in step 4) |
    | `DYNODOC_LLM_API_KEY` | your OpenAI key |
    | `DYNODOC_SETTLE_SECRET` | `openssl rand -hex 24` |
-4. Deploy. Note the service URL, e.g. `https://dynodoc-api.onrender.com`. Migrations run automatically on start; check `GET /api/v1/health` returns 200.
+4. Deploy. Note the service URL, e.g. `https://dynodoc-api.onrender.com`. Migrations run automatically on start; check `GET /health` returns 200.
 
 > **Free-tier note:** the service sleeps after ~15 min idle and cold-starts (~30s) on the next request. Fine for a demo.
 

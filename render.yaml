@@ -12,7 +12,7 @@ services:
     dockerfilePath: ./Dockerfile
     plan: free
     region: singapore # closest free region to IST users
-    healthCheckPath: /api/v1/health
+    healthCheckPath: /health
     envVars:
       - key: DYNODOC_ENVIRONMENT
         value: production
