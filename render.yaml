@@ -1,0 +1,53 @@
+# Render blueprint for the DynoDoc API.
+#
+# The database is external (Neon) — set DYNODOC_DATABASE_URL below. Secrets are
+# marked `sync: false`, so Render prompts for them on first deploy (or set them
+# in the dashboard). Migrations run on container start (see the Dockerfile),
+# since pre-deploy commands aren't available on the free plan.
+services:
+  - type: web
+    name: dynodoc-api
+    runtime: docker
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore # closest free region to IST users
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: DYNODOC_ENVIRONMENT
+        value: production
+      - key: TZ
+        value: Asia/Kolkata
+      # Neon Postgres — MUST be the asyncpg URL: postgresql+asyncpg://USER:PASS@HOST/DB
+      - key: DYNODOC_DATABASE_URL
+        sync: false
+      # `openssl rand -hex 32`
+      - key: DYNODOC_SESSION_SECRET
+        sync: false
+      # SPA and API are on different domains, so cross-site cookies need this.
+      - key: DYNODOC_SESSION_SAME_SITE
+        value: none
+      # Your Vercel URL, as a JSON list, e.g.
+      - key: DYNODOC_CORS_ORIGINS
+        sync: false
+      # Google OAuth
+      - key: DYNODOC_GOOGLE_CLIENT_ID
+        sync: false
+      - key: DYNODOC_GOOGLE_CLIENT_SECRET
+        sync: false
+      # https://<this-service>.onrender.com/api/v1/auth/google/callback
+      - key: DYNODOC_GOOGLE_REDIRECT_URI
+        sync: false
+      # Where to land after sign-in: https://<your-vercel-app>/app
+      - key: DYNODOC_FRONTEND_POST_LOGIN_URL
+        sync: false
+      # LLM (OpenAI)
+      - key: DYNODOC_LLM_PROVIDER
+        value: openai
+      - key: DYNODOC_LLM_MODEL
+        value: gpt-4.1-mini
+      - key: DYNODOC_LLM_API_KEY
+        sync: false
+      # Shared secret for the nightly leaderboard cron — `openssl rand -hex 24`
+      - key: DYNODOC_SETTLE_SECRET
+        sync: false

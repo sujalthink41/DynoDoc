@@ -49,3 +49,15 @@ export async function apiPost<T = void>(path: string, body?: unknown): Promise<T
     }),
   )
 }
+
+/** PUT with a JSON body. */
+export async function apiPut<T = void>(path: string, body: unknown): Promise<T> {
+  return parse<T>(
+    await fetch(apiUrl(path), {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  )
+}

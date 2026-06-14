@@ -23,6 +23,19 @@ class PlayerProfile(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     current_streak: Mapped[int] = mapped_column(Integer, default=0)
     longest_streak: Mapped[int] = mapped_column(Integer, default=0)
     last_activity_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    last_visit_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # daily visit bonus
+    bonus_course_slots: Mapped[int] = mapped_column(Integer, default=0)  # bought with coins
+
+
+class Redemption(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """A coins-for-reward redemption (merch tiers) — for history + claimed state."""
+
+    __tablename__ = "redemptions"
+
+    user_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    item_key: Mapped[str] = mapped_column(String(40))
+    coins_spent: Mapped[int] = mapped_column(Integer)
+    shipping_address: Mapped[str] = mapped_column(String(600), default="")
 
 
 class CoinTxn(Base, UUIDPrimaryKeyMixin, TimestampMixin):

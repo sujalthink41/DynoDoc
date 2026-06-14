@@ -8,28 +8,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.course.models import Lecture
 from app.domains.gamification.dtos import CoinTxnView, PlayerView
-from app.domains.gamification.models import CoinTxn, GamePlay, LessonUnlock, PlayerProfile
+from app.domains.gamification.models import (
+    CoinTxn,
+    GamePlay,
+    LessonUnlock,
+    PlayerProfile,
+    Redemption,
+)
 from app.domains.user.models import User
 from app.shared.errors import AppError
 
 # --- DynoCoin economy (tunable in one place) ------------------------------
-QUIZ_PASS_REWARD = 15
-MASTERY_BONUS = 25
-UNLOCK_COST = 120  # deliberately steep — unlocking ahead should take real effort
-CONNECTIONS_PER_GROUP = 8  # coins per correct group
-CONNECTIONS_SOLVE_BONUS = 18  # extra coins for solving all four
-STREAK_MILESTONES = {3: 20, 7: 50, 14: 100, 30: 250}
-
-
-def connections_speed_bonus(duration_seconds: int) -> int:
-    """Reward fast solves (only applied when the puzzle is fully solved)."""
-    if duration_seconds <= 30:
-        return 15
-    if duration_seconds <= 60:
-        return 10
-    if duration_seconds <= 120:
-        return 5
-    return 0
+CONNECTIONS_REWARD = 10  # solving the daily game (0 if not fully solved)
+DAILY_VISIT_REWARD = 2  # first visit each day
+LESSON_COMPLETE_REWARD = 5  # passing a lesson's quiz (first time)
+COURSE_COMPLETE_REWARD = 100  # finishing a whole course (first time)
+UNLOCK_COST = 100  # spend to read-unlock a locked lesson
+EXTRA_COURSE_COST = 500  # spend to earn one extra course slot beyond the free limit
+DAILY_PAYOUTS = (50, 30, 20)  # nightly bonus for the daily leaderboard's top 3
+DAILY_RANK_REASON = "daily_rank"
 
 
 async def get_or_create_profile(session: AsyncSession, user_id: UUID) -> PlayerProfile:
@@ -67,18 +64,52 @@ async def spend_coins(
     return profile
 
 
-def bump_streak(profile: PlayerProfile, today: date) -> int:
-    """Advance the daily streak for an activity on `today`; return milestone bonus."""
+def bump_streak(profile: PlayerProfile, today: date) -> None:
+    """Advance the daily streak for an activity on `today` (no coin payout)."""
     last = profile.last_activity_date
     if last == today:
-        return 0  # already counted today
+        return  # already counted today
     if last == today - timedelta(days=1):
         profile.current_streak += 1
     else:
         profile.current_streak = 1
     profile.last_activity_date = today
     profile.longest_streak = max(profile.longest_streak, profile.current_streak)
-    return STREAK_MILESTONES.get(profile.current_streak, 0)
+
+
+async def daily_visit_bonus(session: AsyncSession, user_id: UUID, today: date) -> int:
+    """Award the once-a-day visit bonus; returns coins granted (0 if already today)."""
+    profile = await get_or_create_profile(session, user_id)
+    if profile.last_visit_date == today:
+        return 0
+    profile.last_visit_date = today
+    await award_coins(session, user_id=user_id, amount=DAILY_VISIT_REWARD, reason="daily_visit")
+    return DAILY_VISIT_REWARD
+
+
+async def list_redemptions(session: AsyncSession, user_id: UUID) -> list[Redemption]:
+    result = await session.execute(select(Redemption).where(Redemption.user_id == user_id))
+    return list(result.scalars().all())
+
+
+async def redeem_reward(
+    session: AsyncSession, *, user_id: UUID, item_key: str, cost: int, address: str
+) -> PlayerProfile:
+    """Spend coins on a merch reward (deducts the balance) and record it + address."""
+    profile = await spend_coins(session, user_id=user_id, amount=cost, reason=f"reward:{item_key}")
+    session.add(
+        Redemption(user_id=user_id, item_key=item_key, coins_spent=cost, shipping_address=address)
+    )
+    await session.flush()
+    return profile
+
+
+async def buy_course_slot(session: AsyncSession, *, user_id: UUID, cost: int) -> PlayerProfile:
+    """Spend coins for one extra course slot beyond the free limit."""
+    profile = await spend_coins(session, user_id=user_id, amount=cost, reason="extra_course")
+    profile.bonus_course_slots += 1
+    await session.flush()
+    return profile
 
 
 async def list_recent_txns(session: AsyncSession, user_id: UUID, limit: int = 10) -> list[CoinTxn]:
@@ -105,6 +136,25 @@ async def get_play(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def game_play_counts(session: AsyncSession, user_id: UUID, game_key: str) -> tuple[int, int]:
+    """(total plays, solved plays) for a learner in one game — for profile stats."""
+    total = await session.execute(
+        select(func.count())
+        .select_from(GamePlay)
+        .where(GamePlay.user_id == user_id, GamePlay.game_key == game_key)
+    )
+    solved = await session.execute(
+        select(func.count())
+        .select_from(GamePlay)
+        .where(
+            GamePlay.user_id == user_id,
+            GamePlay.game_key == game_key,
+            GamePlay.solved.is_(True),
+        )
+    )
+    return int(total.scalar_one()), int(solved.scalar_one())
 
 
 async def add_play(
@@ -168,6 +218,43 @@ async def daily_leaderboard(
         .limit(limit)
     )
     return [(row[0], row[1]) for row in result.all()]
+
+
+async def settle_daily_leaderboard(
+    session: AsyncSession,
+    *,
+    game_key: str,
+    day: date,
+    payouts: tuple[int, ...] = DAILY_PAYOUTS,
+) -> list[tuple[UUID, int, int]]:
+    """Award the nightly bonus to `day`'s top finishers. Idempotent per day.
+
+    Only players who actually solved the puzzle are paid. Returns the list of
+    (user_id, rank, coins) granted (empty if already settled or nobody solved).
+    """
+    already = await session.execute(
+        select(CoinTxn.id)
+        .where(CoinTxn.reason == DAILY_RANK_REASON, CoinTxn.ref.like(f"{day}#%"))
+        .limit(1)
+    )
+    if already.scalar_one_or_none() is not None:
+        return []  # this day was already settled
+
+    rows = await daily_leaderboard(session, game_key, day, limit=len(payouts))
+    awarded: list[tuple[UUID, int, int]] = []
+    for index, (play, owner) in enumerate(rows):
+        if not play.solved:
+            continue  # no prize for an unsolved board
+        coins = payouts[index]
+        await award_coins(
+            session,
+            user_id=owner.id,
+            amount=coins,
+            reason=DAILY_RANK_REASON,
+            ref=f"{day}#{index + 1}",
+        )
+        awarded.append((owner.id, index + 1, coins))
+    return awarded
 
 
 async def daily_play_rank(
@@ -234,6 +321,7 @@ def to_player_view(profile: PlayerProfile, *, played_today: bool) -> PlayerView:
         current_streak=profile.current_streak,
         longest_streak=profile.longest_streak,
         played_today=played_today,
+        bonus_course_slots=profile.bonus_course_slots,
     )
 
 

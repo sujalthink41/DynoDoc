@@ -205,6 +205,46 @@ body {
   display: none;
 }
 
+/* Theme-aware scrollbars (follow light/dark via --fg). Panes that opt out use
+   `.scrollbar-none`, whose rules override these by specificity. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--fg) 25%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--fg) 22%, transparent);
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--fg) 40%, transparent);
+}
+
+/* Playful wiggle for badge icons on hover. */
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-9deg);
+  }
+  75% {
+    transform: rotate(9deg);
+  }
+}
+.hover-wiggle:hover {
+  animation: wiggle 0.5s ease-in-out;
+}
+
 /* Subtle dotted backdrop for hero sections. */
 .bg-dots {
   background-image: radial-gradient(currentColor 1px, transparent 1px);

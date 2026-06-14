@@ -1,42 +1,62 @@
 """Gamification routes — DynoCoin wallet, Connections game, and the leaderboard."""
 
-from datetime import date
+import secrets
+from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.gamification import connections as conn
+from app.domains.gamification import rewards as merch
 from app.domains.gamification.dtos import (
     CoinTxnView,
     ConnectionsResult,
     ConnectionsView,
     ConnGroupView,
+    DailyBonusView,
+    DailySettleAward,
+    DailySettleView,
     LeaderboardEntry,
     LeaderboardView,
     PlayerView,
+    RedemptionView,
+    RewardsView,
+    RewardView,
 )
 from app.domains.gamification.models import GamePlay
 from app.domains.gamification.repository import (
-    CONNECTIONS_PER_GROUP,
-    CONNECTIONS_SOLVE_BONUS,
+    CONNECTIONS_REWARD,
+    EXTRA_COURSE_COST,
     add_play,
     award_coins,
     bump_streak,
-    connections_speed_bonus,
+    buy_course_slot,
     daily_leaderboard,
     daily_play_rank,
+    daily_visit_bonus,
     get_or_create_profile,
     get_play,
     leaderboard_top,
     list_recent_txns,
+    list_redemptions,
     player_rank,
+    redeem_reward,
+    settle_daily_leaderboard,
     to_player_view,
     to_txn_view,
 )
 from app.domains.user.models import User
 from app.entrypoints.http.deps import db_session, require_principal
 from app.entrypoints.http.schemas.connections import ConnectionsAttemptRequest
-from app.shared.errors import ConflictError, ValidationError
+from app.entrypoints.http.schemas.reward import RedeemRequest
+from app.runtime.settings import Settings, get_settings
+from app.shared.errors import (
+    ConflictError,
+    DependencyUnavailableError,
+    NotFoundError,
+    PermissionDeniedError,
+    ValidationError,
+)
 
 router = APIRouter(prefix="/game", tags=["gamification"])
 
@@ -62,6 +82,30 @@ async def list_transactions_route(
 ) -> list[CoinTxnView]:
     txns = await list_recent_txns(session, user.id)
     return [to_txn_view(txn) for txn in txns]
+
+
+@router.get("/redemptions", response_model=list[RedemptionView])
+async def list_redemptions_route(
+    user: User = Depends(require_principal),
+    session: AsyncSession = Depends(db_session),
+) -> list[RedemptionView]:
+    rows = sorted(
+        await list_redemptions(session, user.id), key=lambda r: r.created_at, reverse=True
+    )
+    views: list[RedemptionView] = []
+    for row in rows:
+        reward = merch.get_reward(row.item_key)
+        views.append(
+            RedemptionView(
+                item_key=row.item_key,
+                title=reward.title if reward else row.item_key,
+                emoji=reward.emoji if reward else "🎁",
+                coins_spent=row.coins_spent,
+                shipping_address=row.shipping_address,
+                created_at=row.created_at,
+            )
+        )
+    return views
 
 
 @router.get("/connections", response_model=ConnectionsView)
@@ -101,13 +145,12 @@ async def attempt_connections_route(
     correct = conn.grade(puzzle, body.groups)
     solved = correct == len(puzzle.groups)
     duration = max(0, body.duration_seconds)
-    coins = CONNECTIONS_PER_GROUP * correct
-    if solved:
-        coins += CONNECTIONS_SOLVE_BONUS + connections_speed_bonus(duration)
+    coins = CONNECTIONS_REWARD if solved else 0  # win → 10, otherwise → 0
 
     profile = await get_or_create_profile(session, user.id)
-    coins += bump_streak(profile, today)
-    await award_coins(session, user_id=user.id, amount=coins, reason="connections")
+    bump_streak(profile, today)  # streak advances on playing (no coin payout)
+    if coins:
+        await award_coins(session, user_id=user.id, amount=coins, reason="connections")
     await add_play(
         session,
         user_id=user.id,
@@ -200,3 +243,96 @@ async def get_leaderboard_route(
     if period == "today":
         return await _today_board(session, user)
     return await _all_time_board(session, user)
+
+
+@router.post("/visit", response_model=DailyBonusView)
+async def daily_visit_route(
+    user: User = Depends(require_principal),
+    session: AsyncSession = Depends(db_session),
+) -> DailyBonusView:
+    awarded = await daily_visit_bonus(session, user.id, date.today())
+    profile = await get_or_create_profile(session, user.id)
+    return DailyBonusView(awarded=awarded, coins=profile.coins)
+
+
+@router.get("/rewards", response_model=RewardsView)
+async def list_rewards_route(
+    user: User = Depends(require_principal),
+    session: AsyncSession = Depends(db_session),
+) -> RewardsView:
+    profile = await get_or_create_profile(session, user.id)
+    claimed = {r.item_key for r in await list_redemptions(session, user.id)}
+    return RewardsView(
+        coins=profile.coins,
+        rewards=[
+            RewardView(
+                key=r.key,
+                title=r.title,
+                emoji=r.emoji,
+                cost=r.cost,
+                claimed=r.key in claimed,
+                affordable=profile.coins >= r.cost,
+            )
+            for r in merch.REWARDS
+        ],
+    )
+
+
+@router.post("/rewards/{item_key}/redeem", response_model=PlayerView)
+async def redeem_reward_route(
+    item_key: str,
+    body: RedeemRequest,
+    user: User = Depends(require_principal),
+    session: AsyncSession = Depends(db_session),
+) -> PlayerView:
+    reward = merch.get_reward(item_key)
+    if reward is None:
+        raise NotFoundError("Reward not found", code="reward_not_found")
+    if len(body.address.strip()) < 10:
+        raise ValidationError("A full shipping address is required", code="address_required")
+    claimed = {r.item_key for r in await list_redemptions(session, user.id)}
+    if item_key in claimed:
+        raise ConflictError("You've already redeemed this reward", code="reward_claimed")
+    profile = await redeem_reward(
+        session, user_id=user.id, item_key=item_key, cost=reward.cost, address=body.address.strip()
+    )
+    played = await get_play(session, user.id, conn.GAME_KEY, date.today())
+    return to_player_view(profile, played_today=played is not None)
+
+
+@router.post("/settle-daily", response_model=DailySettleView)
+async def settle_daily_route(
+    target: str | None = Query(None, alias="date"),
+    x_settle_secret: str | None = Header(None),
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(db_session),
+) -> DailySettleView:
+    """Award the nightly leaderboard bonus. Called by a scheduled job (cron).
+
+    Guarded by a shared secret instead of a user session. With no ?date, it
+    settles the day that just ended (yesterday in the server's timezone), which
+    is what the midnight cron wants.
+    """
+    if not settings.settle_secret:
+        raise DependencyUnavailableError(
+            "Leaderboard settlement is not configured", code="settle_unavailable"
+        )
+    if not secrets.compare_digest(x_settle_secret or "", settings.settle_secret):
+        raise PermissionDeniedError("Invalid settlement secret", code="bad_settle_secret")
+
+    day = date.fromisoformat(target) if target else date.today() - timedelta(days=1)
+    awarded = await settle_daily_leaderboard(session, game_key=conn.GAME_KEY, day=day)
+    return DailySettleView(
+        day=day,
+        awards=[DailySettleAward(rank=rank, coins=coins) for _, rank, coins in awarded],
+    )
+
+
+@router.post("/course-slot", response_model=PlayerView)
+async def buy_course_slot_route(
+    user: User = Depends(require_principal),
+    session: AsyncSession = Depends(db_session),
+) -> PlayerView:
+    profile = await buy_course_slot(session, user_id=user.id, cost=EXTRA_COURSE_COST)
+    played = await get_play(session, user.id, conn.GAME_KEY, date.today())
+    return to_player_view(profile, played_today=played is not None)

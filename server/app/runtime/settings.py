@@ -1,6 +1,7 @@
 """Application configuration (12-factor: everything from the environment)."""
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -33,12 +34,20 @@ class Settings(BaseSettings):
     session_secret: str = "dev-only-change-me"
     csrf_header: str = "X-CSRF-Token"
     csrf_cookie: str = "dynodoc_csrf"
+    # "lax" for same-origin/dev; set to "none" when the SPA and API live on
+    # different domains (cross-site cookies need SameSite=None; Secure).
+    session_same_site: Literal["lax", "strict", "none"] = "lax"
+
+    # Shared secret guarding the nightly leaderboard-settlement endpoint, which a
+    # scheduled job (cron) calls. Unset = endpoint disabled (503).
+    settle_secret: str | None = None
 
     # Google OAuth (left unset until you provide them; the app degrades gracefully).
     google_client_id: str | None = None
     google_client_secret: str | None = None
     google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
-    frontend_post_login_url: str = "http://localhost:3000"
+    # Where to land users after a successful sign-in — the app, not the marketing page.
+    frontend_post_login_url: str = "http://localhost:3000/app"
 
     # LLM (provider-agnostic via LiteLLM). Switching provider/model later is just
     # config. Optional until set — the app degrades to 503 on AI endpoints.

@@ -29,7 +29,7 @@ export function CoursePage() {
   const currentLevel = Math.min(completedModules + 1, total)
 
   return (
-    <main className="px-6 py-8 sm:px-10">
+    <main>
       <Breadcrumb
         items={[
           { label: 'Home', to: '/app', icon: <HomeIcon /> },

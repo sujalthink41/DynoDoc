@@ -1,0 +1,19 @@
+name: Daily leaderboard payout
+
+# Settles the previous day's Connections leaderboard and awards the top-3 bonus.
+# 00:05 IST == 18:35 UTC. (GitHub cron runs in UTC and may lag a few minutes,
+# which is fine — the endpoint settles "yesterday" and is idempotent.)
+on:
+  schedule:
+    - cron: '35 18 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call settle-daily endpoint
+        run: |
+          curl -fsS --retry 3 --retry-delay 10 -X POST \
+            "${{ secrets.DYNODOC_API_URL }}/api/v1/game/settle-daily" \
+            -H "X-Settle-Secret: ${{ secrets.DYNODOC_SETTLE_SECRET }}"

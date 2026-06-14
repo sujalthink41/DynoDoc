@@ -8,6 +8,7 @@ import { AIThinking } from '@/components/ui/AIThinking'
 import { Breadcrumb, HomeIcon } from '@/components/ui/Breadcrumb'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { DynoCoin } from '@/components/ui/DynoCoin'
 import { Spinner } from '@/components/ui/Spinner'
 import { useAuth } from '@/features/auth/queries'
@@ -155,6 +156,7 @@ export function LecturePage() {
   const [chatOpen, setChatOpen] = useState(false)
   const [navOpen, setNavOpen] = useState(false) // lessons drawer on small screens
   const [quote, setQuote] = useState<string | null>(null)
+  const [confirmUnlock, setConfirmUnlock] = useState(false)
   const proseRef = useRef<HTMLDivElement>(null)
 
   if (isPending) {
@@ -194,10 +196,14 @@ export function LecturePage() {
     }
   }
 
-  const unlockAndGenerate = (index: number) => {
+  const unlockLesson = (index: number) => {
     unlockTopic.mutate(index, {
-      onSuccess: () => generate(index),
+      onSuccess: () => {
+        setConfirmUnlock(false)
+        toast.success('Lesson unlocked! Hit “Generate this lesson” to read it.')
+      },
       onError: (error) => {
+        setConfirmUnlock(false)
         if (error instanceof ApiError && error.code === 'insufficient_coins') {
           toast.error('Not enough DynoCoins — play Connections or pass quizzes to earn more.')
         } else {
@@ -353,8 +359,8 @@ export function LecturePage() {
                   spending DynoCoins. (You’ll still need the quiz to complete it.)
                 </p>
                 <Button
-                  onClick={() => unlockAndGenerate(selected)}
-                  disabled={unlockTopic.isPending || generateTopic.variables === selected}
+                  onClick={() => setConfirmUnlock(true)}
+                  disabled={unlockTopic.isPending}
                   className="mt-6 gap-1.5 px-6 py-3"
                 >
                   {unlockTopic.isPending ? (
@@ -414,6 +420,21 @@ export function LecturePage() {
 
       {/* Select text in the lesson → "Ask DynoDoc" pill */}
       <SelectionAsk targetRef={proseRef} onAsk={askAboutSelection} />
+
+      <ConfirmDialog
+        open={confirmUnlock}
+        title="Unlock this lesson?"
+        body={
+          <span className="flex items-center gap-1">
+            This spends <DynoCoin className="h-4 w-4" /> {LESSON_UNLOCK_COST}. You can then generate
+            and read it — the quiz still gates your progress.
+          </span>
+        }
+        confirmLabel="Unlock"
+        busy={unlockTopic.isPending}
+        onConfirm={() => selected !== null && unlockLesson(selected)}
+        onCancel={() => setConfirmUnlock(false)}
+      />
 
       {/* Circular reopen button when the chat is closed */}
       {!chatOpen && (

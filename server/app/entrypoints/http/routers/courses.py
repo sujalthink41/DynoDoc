@@ -13,6 +13,7 @@ from app.domains.course.repository import (
     get_intake_session,
     list_courses,
 )
+from app.domains.gamification.repository import get_or_create_profile
 from app.domains.user.models import User
 from app.entrypoints.http.deps import db_session, get_llm_model, require_principal
 from app.entrypoints.http.schemas.course import CreateCourseRequest
@@ -20,6 +21,8 @@ from app.processes.course_generation.pipeline import generate_course
 from app.shared.errors import AppError, NotFoundError
 
 router = APIRouter(prefix="/courses", tags=["courses"])
+
+FREE_COURSE_LIMIT = 3
 
 
 @router.post("", response_model=CourseView, status_code=status.HTTP_201_CREATED)
@@ -34,6 +37,16 @@ async def create_course_route(
         raise NotFoundError("Intake session not found", code="intake_not_found")
     if intake.status != "ready" or not intake.profile:
         raise AppError("Intake is not complete yet", code="intake_not_ready", status_code=409)
+
+    existing = await list_courses(session, user.id)
+    profile = await get_or_create_profile(session, user.id)
+    limit = FREE_COURSE_LIMIT + profile.bonus_course_slots
+    if len(existing) >= limit:
+        raise AppError(
+            f"You've used all {limit} course slots. Earn an extra slot with DynoCoins or upgrade.",
+            code="course_limit_reached",
+            status_code=402,
+        )
 
     course = await generate_course(
         session,

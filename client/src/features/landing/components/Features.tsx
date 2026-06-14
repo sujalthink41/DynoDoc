@@ -1,10 +1,12 @@
 import { motion } from 'framer-motion'
 
 const FEATURES = [
-  { icon: '🧭', title: 'Personalized roadmap', desc: 'Answer a few questions and get a course mapped to your level, goal, and pace.' },
-  { icon: '✍️', title: 'Lessons written for you', desc: 'Every lesson is generated for how you learn — go simpler or deeper on demand.' },
-  { icon: '🛠️', title: 'Learn by doing', desc: 'Quizzes and hands-on tasks, checked by AI — proof you actually learned it.' },
-  { icon: '🔗', title: 'Best of the web', desc: 'Curated articles and videos for every topic, so you never get lost again.' },
+  { icon: '🧭', title: 'Roadmap sized to your goal', desc: 'A focused 3-lesson explainer or a full career path — the AI builds exactly what your goal needs, no filler.' },
+  { icon: '✍️', title: 'Lessons written for you', desc: 'Every lesson is generated for your level and intent — concise where it can be, deep where it counts.' },
+  { icon: '💬', title: 'Ask DynoDoc anytime', desc: 'A built-in AI tutor that knows your exact lesson — ask follow-ups and get grounded answers, in context.' },
+  { icon: '✅', title: 'Prove it to unlock', desc: 'Pass a quiz to move on, hit 100% to master a lesson. Real checkpoints, not just videos you scrub past.' },
+  { icon: '🎮', title: 'Learn, play, earn', desc: 'A daily puzzle, streaks, and DynoCoins for every win — climb the leaderboard and redeem coins for merch.' },
+  { icon: '📈', title: 'Progress you can feel', desc: 'Badges, mastery, and streaks track how far you’ve come — and keep you coming back.' },
 ]
 
 export function Features() {
@@ -18,7 +20,7 @@ export function Features() {
           Not another pile of videos — a path built around your goal, and only yours.
         </p>
       </div>
-      <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {FEATURES.map((feature, i) => (
           <motion.div
             key={feature.title}

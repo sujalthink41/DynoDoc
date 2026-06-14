@@ -14,10 +14,14 @@ from app.domains.gamification.repository import (
     add_lesson_unlock,
     award_coins,
     bump_streak,
+    buy_course_slot,
+    daily_visit_bonus,
     get_or_create_profile,
     leaderboard_top,
+    list_redemptions,
     list_unlocked_lessons,
     player_rank,
+    redeem_reward,
     spend_coins,
 )
 from app.shared.errors import AppError
@@ -40,7 +44,7 @@ async def test_spend_beyond_balance_raises(db_session: AsyncSession) -> None:
     assert err.value.status_code == 402
 
 
-def test_bump_streak_consecutive_gap_and_milestone() -> None:
+def test_bump_streak_consecutive_gap_and_same_day() -> None:
     profile = PlayerProfile(
         user_id=uuid4(),
         coins=0,
@@ -50,14 +54,14 @@ def test_bump_streak_consecutive_gap_and_milestone() -> None:
         last_activity_date=None,
     )
     day = date(2026, 6, 1)
-    assert bump_streak(profile, day) == 0  # day 1
-    assert bump_streak(profile, day + timedelta(days=1)) == 0  # day 2
-    assert bump_streak(profile, day + timedelta(days=2)) == 20  # day 3 → milestone
+    bump_streak(profile, day)  # day 1
+    bump_streak(profile, day + timedelta(days=1))  # day 2
+    bump_streak(profile, day + timedelta(days=2))  # day 3
     assert profile.current_streak == 3
-    assert bump_streak(profile, day + timedelta(days=5)) == 0  # missed days → reset
+    bump_streak(profile, day + timedelta(days=5))  # missed days → reset
     assert profile.current_streak == 1
     assert profile.longest_streak == 3
-    assert bump_streak(profile, day + timedelta(days=5)) == 0  # same day → no double count
+    bump_streak(profile, day + timedelta(days=5))  # same day → no double count
     assert profile.current_streak == 1
 
 
@@ -130,3 +134,33 @@ async def test_profile_starts_empty(db_session: AsyncSession) -> None:
     assert profile.current_streak == 0
     # leaderboard_top works on an empty table.
     assert await leaderboard_top(db_session) == []
+
+
+async def test_daily_visit_bonus_once_per_day(db_session: AsyncSession) -> None:
+    uid = uuid4()
+    assert await daily_visit_bonus(db_session, uid, date(2026, 6, 1)) == 2
+    assert await daily_visit_bonus(db_session, uid, date(2026, 6, 1)) == 0  # same day
+    assert await daily_visit_bonus(db_session, uid, date(2026, 6, 2)) == 2  # next day
+
+
+async def test_redeem_deducts_balance_but_keeps_lifetime(db_session: AsyncSession) -> None:
+    uid = uuid4()
+    await award_coins(db_session, user_id=uid, amount=1200, reason="test")
+    profile = await redeem_reward(
+        db_session, user_id=uid, item_key="diary", cost=1000, address="123 Dino St, Pangaea"
+    )
+    assert profile.coins == 200  # balance deducted
+    assert profile.lifetime_coins == 1200  # lifetime untouched
+    redemptions = await list_redemptions(db_session, uid)
+    assert [r.item_key for r in redemptions] == ["diary"]
+    assert redemptions[0].shipping_address == "123 Dino St, Pangaea"
+
+
+async def test_buy_course_slot_increments_and_guards_balance(db_session: AsyncSession) -> None:
+    uid = uuid4()
+    await award_coins(db_session, user_id=uid, amount=500, reason="test")
+    profile = await buy_course_slot(db_session, user_id=uid, cost=500)
+    assert profile.bonus_course_slots == 1
+    assert profile.coins == 0
+    with pytest.raises(AppError):
+        await buy_course_slot(db_session, user_id=uid, cost=500)  # nothing left

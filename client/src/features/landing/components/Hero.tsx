@@ -29,12 +29,12 @@ const DEMOS = [
     roadmap: ['The math you actually need', 'Python for ML', 'Core ML algorithms', 'Train your first model'],
   },
   {
-    prompt: 'I want to master public speaking.',
-    roadmap: ['Beat the fear', 'Structure a talk', 'Delivery & presence', 'Give a real talk'],
+    prompt: 'Just explain how JWT authentication works.',
+    roadmap: ['What a JWT is', 'Signing & verifying', 'Using JWTs in an API'],
   },
   {
-    prompt: 'I want to learn guitar in 3 months.',
-    roadmap: ['Chords & strumming', 'Reading tabs', 'Your first songs', 'Play a full song'],
+    prompt: 'I want to become a backend engineer.',
+    roadmap: ['Programming foundations', 'Databases & SQL', 'Building REST APIs', 'Auth & security', 'Deploy & scale'],
   },
 ]
 
@@ -148,7 +148,7 @@ export function Hero() {
           variants={item}
           className="font-display text-5xl font-bold leading-[1.05] tracking-tight text-fg sm:text-7xl"
         >
-          Master anything.
+          Master any tech skill.
           <br />
           <span className="text-shimmer bg-gradient-to-r from-brand-2 via-brand to-brand-strong bg-clip-text text-transparent">
             Your AI builds the path.
@@ -156,9 +156,10 @@ export function Hero() {
         </motion.h1>
 
         <motion.p variants={item} className="mt-6 max-w-2xl text-lg text-muted">
-          Tell DynoDoc what you want to learn. Get a personalized course — lessons written for{' '}
-          <em className="text-fg">your</em> level, hands-on tasks, and the best resources on the
-          web. Learning that finally feels made for you.
+          Tell DynoDoc what you want to learn — from a single concept to a full career path. It
+          builds a roadmap <em className="text-fg">sized to your goal</em>, writes every lesson for{' '}
+          <em className="text-fg">your</em> level, checks you with quizzes, and answers your
+          questions as you go. Learning that finally feels made for you.
         </motion.p>
 
         <motion.div variants={item} className="mt-10 flex flex-col items-center gap-4 sm:flex-row">

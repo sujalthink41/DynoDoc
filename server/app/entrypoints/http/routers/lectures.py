@@ -19,6 +19,7 @@ from app.domains.course.models import Lecture
 from app.domains.course.progress import (
     PASS_THRESHOLD,
     build_lecture_detail_view,
+    compute_lessons,
     is_lesson_unlocked,
 )
 from app.domains.course.repository import (
@@ -31,12 +32,13 @@ from app.domains.course.repository import (
     record_quiz_score,
 )
 from app.domains.gamification.repository import (
-    MASTERY_BONUS,
-    QUIZ_PASS_REWARD,
+    COURSE_COMPLETE_REWARD,
+    LESSON_COMPLETE_REWARD,
     UNLOCK_COST,
     add_lesson_unlock,
     award_coins,
     get_lesson_unlock,
+    list_recent_txns,
     spend_coins,
 )
 from app.domains.user.models import User
@@ -190,7 +192,6 @@ async def attempt_quiz_route(
     if existing is not None and existing.best_score >= MASTERY_SCORE:
         raise ConflictError("You've already mastered this quiz", code="quiz_mastered")
     was_passed = existing is not None and existing.passed
-    prev_best = existing.best_score if existing is not None else 0
 
     total = len(quiz.questions)
     correct_flags = [
@@ -206,14 +207,31 @@ async def attempt_quiz_route(
     )
     mastered = progress.best_score >= MASTERY_SCORE
 
-    # DynoCoins: reward the FIRST pass and the FIRST mastery (no farming via retries).
-    ref = f"{lecture.id}:{topic_index}"
+    # DynoCoins: 5 for the FIRST time a lesson is passed (no farming via retries),
+    # plus 100 the first time the WHOLE course is completed.
     if not was_passed and progress.passed:
         await award_coins(
-            session, user_id=user.id, amount=QUIZ_PASS_REWARD, reason="quiz_pass", ref=ref
+            session,
+            user_id=user.id,
+            amount=LESSON_COMPLETE_REWARD,
+            reason="lesson_complete",
+            ref=f"{lecture.id}:{topic_index}",
         )
-    if prev_best < MASTERY_SCORE and progress.best_score >= MASTERY_SCORE:
-        await award_coins(session, user_id=user.id, amount=MASTERY_BONUS, reason="mastery", ref=ref)
+        lessons = await compute_lessons(session, lecture.course_id, user.id)
+        course_done = bool(lessons) and all(lesson.passed for lesson in lessons)
+        course_ref = str(lecture.course_id)
+        already = any(
+            txn.reason == "course_complete" and txn.ref == course_ref
+            for txn in await list_recent_txns(session, user.id, limit=200)
+        )
+        if course_done and not already:
+            await award_coins(
+                session,
+                user_id=user.id,
+                amount=COURSE_COMPLETE_REWARD,
+                reason="course_complete",
+                ref=course_ref,
+            )
 
     # Correct answers are revealed only on mastery — never on a failing/partial pass.
     answers = _answer_indices(quiz.questions)
@@ -263,7 +281,11 @@ async def unlock_lesson_route(
     user: User = Depends(require_principal),
     session: AsyncSession = Depends(db_session),
 ) -> LectureDetailView:
-    """Spend DynoCoins to read-unlock a locked lesson (the quiz still gates progress)."""
+    """Spend DynoCoins to read-unlock a locked lesson.
+
+    This only unlocks it; the learner generates the lesson themselves afterwards.
+    The quiz still gates completion, the next lesson, and coin rewards.
+    """
     lecture = await _load_owned_lecture(session, lecture_id, user)
     _ensure_topic_in_range(lecture, topic_index)
 

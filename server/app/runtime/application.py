@@ -50,7 +50,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         SessionMiddleware,
         secret_key=settings.session_secret,
-        same_site="lax",
+        same_site=settings.session_same_site,
         https_only=settings.environment == "production",
     )
     app.add_middleware(RequestContextMiddleware)
