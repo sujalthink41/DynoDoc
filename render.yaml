@@ -45,7 +45,7 @@ services:
       - key: DYNODOC_LLM_PROVIDER
         value: openai
       - key: DYNODOC_LLM_MODEL
-        value: gpt-4.1-mini
+        value: gpt-5.4-mini
       - key: DYNODOC_LLM_API_KEY
         sync: false
       # Shared secret for the nightly leaderboard cron — `openssl rand -hex 24`
